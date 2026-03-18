@@ -1,0 +1,11 @@
+{
+  "name": "skills",
+  "owner": {
+    "name": "OllyGarden"
+  },
+  "metadata": {
+    "description": "Public OllyGarden AI skills for Rose and the broader ecosystem",
+    "version": "1.0.0"
+  },
+  "plugins": []
+}

@@ -1,0 +1,17 @@
+{
+  "name": "skills",
+  "description": "Public OllyGarden AI skills for Rose and the broader ecosystem",
+  "version": "1.0.0",
+  "author": {
+    "name": "OllyGarden"
+  },
+  "homepage": "https://github.com/ollygarden/skills",
+  "repository": "https://github.com/ollygarden/skills",
+  "keywords": [
+    "ollygarden",
+    "rose",
+    "observability",
+    "opentelemetry",
+    "skills"
+  ]
+}
