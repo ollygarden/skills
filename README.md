@@ -24,6 +24,7 @@ The skills in this repository follow the standardized [Agent Skills](https://age
 
 | Skill | Description |
 |-------|-------------|
+| [insight-remediation](skills/insight-remediation/) | Fetch active service insights from the Olive API and apply remediation fixes to the current codebase |
 
 ## License
 
