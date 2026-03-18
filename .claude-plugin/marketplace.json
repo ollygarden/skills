@@ -7,5 +7,10 @@
     "description": "Public OllyGarden AI skills for Rose and the broader ecosystem",
     "version": "1.0.0"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "insight-remediation",
+      "path": "skills/insight-remediation"
+    }
+  ]
 }
