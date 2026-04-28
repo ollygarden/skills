@@ -4,6 +4,27 @@ Public OllyGarden AI skills for [Rose](https://github.com/ollygarden/rose) and t
 
 The skills in this repository follow the standardized [Agent Skills](https://agentskills.io/specification) format.
 
+## Layout
+
+Skills are grouped by topic under `skills/`:
+
+```
+skills/
+├── ollygarden/                       # OllyGarden's own products
+│   └── insight-remediation/
+└── otel/                             # OllyGarden's opinions on OpenTelemetry
+    ├── general/declarative-config/
+    ├── go/setup/
+    ├── java/setup/
+    └── js/setup/
+```
+
+Skills under `otel/` carry the `ollygarden-otel-` prefix in their `name:` field. They are
+OllyGarden's opinions layered on top of upstream OpenTelemetry facts published in the
+companion package [`opentelemetry-agent-skills`](https://github.com/ollygarden/opentelemetry-agent-skills);
+install both packages so the OTel opinion skills can reference the upstream `otel-go`,
+`otel-declarative-config`, etc.
+
 ## Installation
 
 ### Claude Code
@@ -24,7 +45,11 @@ The skills in this repository follow the standardized [Agent Skills](https://age
 
 | Skill | Description |
 |-------|-------------|
-| [insight-remediation](skills/insight-remediation/) | Fetch active service insights from the Olive API and apply remediation fixes to the current codebase |
+| [`ollygarden-insight-remediation`](skills/ollygarden/insight-remediation/) | Fetch active service insights from the Olive API and apply remediation fixes to the current codebase. |
+| [`ollygarden-otel-declarative-config`](skills/otel/general/declarative-config/) | OllyGarden's declarative-first OpenTelemetry conventions: when to use YAML config, anti-patterns, common patterns. |
+| [`ollygarden-otel-go-setup`](skills/otel/go/setup/) | OllyGarden's recommended Go OTel setup pattern: project structure, Providers struct, runtime attributes, zap log bridge. |
+| [`ollygarden-otel-java-setup`](skills/otel/java/setup/) | OllyGarden's recommended Java OTel setup: Javaagent vs Spring Boot Starter vs autoconfigure decision tree, BOM dependency pattern. |
+| [`ollygarden-otel-js-setup`](skills/otel/js/setup/) | OllyGarden's recommended Node.js OTel setup: project structure, instrumentation choices, entry-point ordering. |
 
 ## License
 

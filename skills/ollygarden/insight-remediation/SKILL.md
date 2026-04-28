@@ -1,5 +1,5 @@
 ---
-name: insight-remediation
+name: ollygarden-insight-remediation
 description: "Fetch active OllyGarden service insights from the Olive API and apply remediation fixes to the current codebase. Use when the user asks to get insights, fix insight, address insight, or remediate insight for the current service. Retrieves insights grouped by impact, then applies fixes strictly following the API-provided remediation_instructions."
 ---
 
