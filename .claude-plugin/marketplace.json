@@ -9,8 +9,24 @@
   },
   "plugins": [
     {
-      "name": "insight-remediation",
-      "path": "skills/insight-remediation"
+      "name": "ollygarden-insight-remediation",
+      "path": "skills/ollygarden/insight-remediation"
+    },
+    {
+      "name": "ollygarden-otel-declarative-config",
+      "path": "skills/otel/general/declarative-config"
+    },
+    {
+      "name": "ollygarden-otel-go-setup",
+      "path": "skills/otel/go/setup"
+    },
+    {
+      "name": "ollygarden-otel-java-setup",
+      "path": "skills/otel/java/setup"
+    },
+    {
+      "name": "ollygarden-otel-js-setup",
+      "path": "skills/otel/js/setup"
     }
   ]
 }
