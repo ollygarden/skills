@@ -17,6 +17,14 @@
       "path": "skills/otel/general/declarative-config"
     },
     {
+      "name": "ollygarden-manual-instrumentation",
+      "path": "skills/otel/general/manual-instrumentation"
+    },
+    {
+      "name": "ollygarden-sdk-setup",
+      "path": "skills/otel/general/sdk-setup"
+    },
+    {
       "name": "ollygarden-otel-go-setup",
       "path": "skills/otel/go/setup"
     },
