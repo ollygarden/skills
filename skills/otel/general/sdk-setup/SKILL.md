@@ -1,5 +1,5 @@
 ---
-name: ollygarden-sdk-setup
+name: ollygarden-otel-sdk-setup
 description: OpenTelemetry SDK initialization and configuration. Use when setting up or reviewing TracerProvider, MeterProvider, or LoggerProvider; choosing exporters, processors, or propagators; configuring OTLP transport; or extending an existing SDK setup for new signals. Use this skill whenever the task involves wiring up the OpenTelemetry SDK, even if the user only mentions "add tracing" or "set up metrics" without saying "SDK."
 ---
 
