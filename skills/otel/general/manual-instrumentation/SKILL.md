@@ -1,5 +1,5 @@
 ---
-name: ollygarden-manual-instrumentation
+name: ollygarden-otel-manual-instrumentation
 description: OpenTelemetry best practices for manual instrumentation. Use when adding, changing, or reviewing OpenTelemetry instrumentation in code. Guidance to choose runtime boundaries, choose signals, apply semantic conventions, handle propagation, control cardinality, and verify the result.
 ---
 
@@ -56,7 +56,7 @@ For SDK initialization, exporter, processor, propagator, and transport configura
 - signal choice: `references/signal-selection.md`
 - propagation and baggage: `references/propagation.md`
 - semantic conventions naming and attributes skill: `otel-semantic-conventions`
-- SDK initialization and configuration skill: `ollygarden-sdk-setup`
+- SDK initialization and configuration skill: `ollygarden-otel-sdk-setup`
 - SDK versions and docs skill: `otel-sdk-versions`
 
 ## Verification Contract
