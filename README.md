@@ -4,6 +4,44 @@ Public OllyGarden AI skills for [Rose](https://github.com/ollygarden/rose) and t
 
 The skills in this repository follow the standardized [Agent Skills](https://agentskills.io/specification) format.
 
+## Installation
+
+### skills.sh
+
+Install via [skills.sh](https://skills.sh/docs):
+
+Install OllyGarden skills:
+
+```
+npx skills add https://github.com/ollygarden/skills/tree/main/skills/ollygarden
+```
+
+Install general OTel skills:
+
+```
+npx skills add https://github.com/ollygarden/skills/tree/main/skills/otel/general
+```
+
+Install language-specific OTel skills (e.g. Go):
+
+```
+npx skills add https://github.com/ollygarden/skills/tree/main/skills/otel/go
+```
+
+### Claude Code
+
+1. Register the repository as a plugin marketplace:
+
+```
+/plugin marketplace add ollygarden/skills
+```
+
+2. Install a skill:
+
+```
+/plugin install <skill-name>@skills
+```
+
 ## Layout
 
 Skills are grouped by topic under `skills/`:
@@ -23,22 +61,6 @@ skills/
 ```
 
 All skill `name:` fields carry an `ollygarden-` prefix to declare ownership in the global skill namespace. Skills under `otel/` are OllyGarden's opinions layered on top of upstream OpenTelemetry facts published in the companion package [`opentelemetry-agent-skills`](https://github.com/ollygarden/opentelemetry-agent-skills); install both packages so the OTel opinion skills can reference the upstream `otel-semantic-conventions`, `otel-sdk-versions`, etc.
-
-## Installation
-
-### Claude Code
-
-1. Register the repository as a plugin marketplace:
-
-```
-/plugin marketplace add ollygarden/skills
-```
-
-2. Install a skill:
-
-```
-/plugin install <skill-name>@skills
-```
 
 ## Available Skills
 
