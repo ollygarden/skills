@@ -32,34 +32,47 @@ same service name.
 
 ## Triage critical insights org-wide
 
-```bash
-# Just the count
-ollygarden insights list --status active --impact Critical --json \
-  | jq '.meta.total'
+`insights list` does **not** echo a `meta.total` — paginate or count
+client-side. Service info is flat on each item: `service_name`,
+`service_id`, `service_version`, `service_environment`.
 
+```bash
 # Top 20 by detection time, with service name
 ollygarden insights list --status active --impact Critical --limit 20 --json \
-  | jq -r '.data[] | [.detected_ts, .service.name, .insight_type.display_name] | @tsv' \
+  | jq -r '.data[] | [.detected_ts, .service_name, .insight_type.display_name] | @tsv' \
   | column -t -s$'\t'
+
+# Count: walk pages until has_more is false
+total=0; offset=0
+while :; do
+  page=$(ollygarden insights list --status active --impact Critical --limit 100 --offset "$offset" --json)
+  rows=$(echo "$page" | jq '.data | length')
+  total=$((total + rows))
+  [ "$(echo "$page" | jq -r '.meta.has_more')" = "true" ] || break
+  offset=$((offset + rows))
+done
+echo "$total critical insights"
 ```
 
 ## Paginate through every page of a list
 
-`list` commands cap `--limit` at 100. Walk the offset until `data` is
-empty:
+`list` commands cap `--limit` at 100. Walk via `meta.has_more`:
 
 ```bash
 offset=0
 while :; do
   page=$(ollygarden insights list --status active --limit 100 --offset "$offset" --json)
-  rows=$(echo "$page" | jq '.data | length')
-  [ "$rows" -eq 0 ] && break
   echo "$page" | jq -r '.data[] | .id'
-  offset=$((offset + rows))
+  [ "$(echo "$page" | jq -r '.meta.has_more')" = "true" ] || break
+  offset=$((offset + $(echo "$page" | jq '.data | length')))
 done
 ```
 
-For very large pages, prefer narrowing with `--service-id`,
+`meta.has_more` is the canonical end-of-stream indicator. `meta.total`
+is present on `services search`, `webhooks list`, and `webhooks
+deliveries list` — but **not** on `insights list`.
+
+For very large datasets, prefer narrowing with `--service-id`,
 `--signal-type`, `--date-from` over walking the whole org.
 
 ## Debug a webhook that isn't firing
@@ -75,16 +88,19 @@ ollygarden webhooks test "$WH"
 
 # 3. Walk recent deliveries, show only the failures
 ollygarden webhooks deliveries list "$WH" --json \
-  | jq -r '.data[] | select(.status_code == null or .status_code >= 400)
-                   | [.id, .status_code, .attempted_at] | @tsv'
+  | jq -r '.data[] | select(.status != "success")
+                   | [.id, .status, .http_status_code, .created_at, .error_message] | @tsv'
 
 # 4. Read the full record for one failure
 ollygarden webhooks deliveries get "$WH" <delivery-id>
 ```
 
-Common causes the delivery record reveals: TLS failures (no status_code),
-4xx from the receiver (signature mismatch, bad path), or timeouts (slow
-endpoint).
+Delivery items expose `status` (`success`/`failure`/etc.),
+`http_status_code` (nullable on TLS/network failures), `attempt_number`,
+`error_message`, `created_at`, and `completed_at`. Common causes a
+failed record reveals: TLS errors (null `http_status_code` + populated
+`error_message`), 4xx from the receiver (signature mismatch, bad path),
+or timeouts (slow endpoint, large `completed_at - created_at` delta).
 
 ## Promote a webhook config across environments
 
@@ -105,16 +121,33 @@ The CLI doesn't ship a native `clone`; `jq` + flags is the idiom.
 
 ## Diff active insights between two services
 
+When `services` is a stable service ID (one specific version):
+
 ```bash
 extract() {
   ollygarden services insights "$1" --status active --json \
-    | jq -r '.data[].insight_type.id' | sort -u
+    | jq -r '.data[].insight_type.display_name' | sort -u
 }
 
 diff <(extract "$SVC_A") <(extract "$SVC_B")
 ```
 
-Lines prefixed `<` are only on A, `>` only on B.
+When you want to diff by service **name** across all of its versions
+(typical when the same service has many version rows in `services
+list`), filter `insights list` instead — `service_name` is flat on each
+item:
+
+```bash
+extract_by_name() {
+  ollygarden insights list --status active --limit 100 --json \
+    | jq -r --arg svc "$1" '.data[] | select(.service_name == $svc) | .insight_type.display_name' \
+    | sort -u
+}
+
+diff <(extract_by_name nameplate) <(extract_by_name dibber)
+```
+
+Lines prefixed `<` are only on the first service, `>` only on the second.
 
 ## Useful jq one-liners
 
@@ -127,10 +160,11 @@ Lines prefixed `<` are only on A, `>` only on B.
             | map({impact: .[0].insight_type.impact, count: length})'
 
 # CSV row per insight (id, service, impact, detected)
-| jq -r '.data[] | [.id, .service.name, .insight_type.impact, .detected_ts] | @csv'
+| jq -r '.data[] | [.id, .service_name, .insight_type.impact, .detected_ts] | @csv'
 
-# Pull pagination meta to drive a loop
-| jq '.meta | {limit, offset, total}'
+# Pull pagination meta to drive a loop (has_more is universal; total only on
+# services search, webhooks list, webhooks deliveries list)
+| jq '.meta | {has_more, total, timestamp}'
 ```
 
 ## Scripting with exit codes
@@ -164,8 +198,8 @@ ollygarden auth status -q --no-probe || ollygarden auth login
 ```bash
 for ctx in $(ollygarden auth list-contexts --json | jq -r '.data[].name'); do
   echo "=== $ctx ==="
-  ollygarden --context "$ctx" insights list --status active --impact Critical --json \
-    | jq -r '"\(.meta.total) critical insights"'
+  ollygarden --context "$ctx" insights list --status active --impact Critical --limit 100 --json \
+    | jq -r '"\(.data | length) critical insights on this page (has_more=\(.meta.has_more))"'
 done
 ```
 
