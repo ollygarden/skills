@@ -66,6 +66,7 @@ All skill `name:` fields carry an `ollygarden-` prefix to declare ownership in t
 
 | Skill | Description |
 |-------|-------------|
+| [`ollygarden-cli`](skills/ollygarden/ollygarden-cli/) | Use the `ollygarden` CLI to query services, insights, analytics, organizations, and manage webhooks from the terminal. |
 | [`ollygarden-insight-remediation`](skills/ollygarden/insight-remediation/) | Fetch active service insights from the Olive API and apply remediation fixes to the current codebase. |
 | [`ollygarden-otel-declarative-config`](skills/otel/general/declarative-config/) | OllyGarden's declarative-first OpenTelemetry conventions: when to use YAML config, anti-patterns, common patterns. |
 | [`ollygarden-manual-instrumentation`](skills/otel/general/manual-instrumentation/) | OllyGarden's manual instrumentation rules: choose runtime boundaries and signals, apply semantic conventions, handle propagation, control cardinality, verify the result. |
