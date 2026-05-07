@@ -36,13 +36,19 @@ When you pass `--json`, the CLI prints the full API envelope:
 ```json
 {
   "data":  [ /* … */ ],
-  "meta":  { "total": 123, "limit": 50, "offset": 0 },
-  "links": { "next": "…", "prev": "…" }
+  "meta":  { "timestamp": "…", "has_more": true, "total": 123, "trace_id": "…" },
+  "links": null
 }
 ```
 
-For `get`-style commands `data` is a single object, not an array. Errors
-go to stderr as `{"error": …, "meta": …}` and the process exits non-zero.
+`meta.has_more` is the canonical pagination indicator on every list
+endpoint. `meta.total` is present on `services search`, `webhooks list`,
+and `webhooks deliveries list` — but **not** on `insights list`. `links`
+is currently always `null`; don't depend on `next`/`prev`.
+
+For `get`-style commands `data` is a single object, not an array.
+Errors go to stderr as `{"error": {"code", "message"}, "meta": …}` and
+the process exits non-zero.
 
 ---
 
@@ -107,14 +113,17 @@ When the last context is removed, the config file is deleted.
 
 ### `analytics services [flags]`
 
-Per-service analytics roll-up.
+Per-service analytics roll-up. Inspect raw shape with `--json | jq` —
+field names vary by tier and may evolve. May return an `UPSTREAM_ERROR`
+when the analytics backend is unavailable; check `meta.trace_id` and
+exit code (`6` for server error).
 
 | Flag | Description |
 |---|---|
 | `--limit <n>` | 1-100, default 50. |
 
 ```bash
-ollygarden analytics services --json | jq '.data[] | {name, signal_volume_24h}'
+ollygarden analytics services --json | jq '.data[0]'   # discover field names
 ```
 
 ---
@@ -141,15 +150,24 @@ List insights across all services in the active org.
 ollygarden insights list --status active --impact Critical,Important --limit 100
 ```
 
+Top-level fields on each item: `id`, `service_id`, `service_name`,
+`service_version`, `service_environment`, `status`, `attributes`,
+`detected_ts`, `telemetry_ts`, `created_at`, `updated_at`, plus a
+nested `insight_type` object (`id`, `name`, `display_name`, `impact`,
+`signal_type`, `description`, `remediation_instructions`).
+
 ### `insights get <insight-id>`
 
 Show full details for a single insight, including `attributes` and
-`remediation_instructions`.
+`insight_type.remediation_instructions`.
 
 ### `insights summary <insight-id>`
 
 Print the AI-generated summary of one insight. Useful as a one-shot
-explainer before deciding whether to remediate.
+explainer before deciding whether to remediate. The `--json` envelope
+returns `data: {insight_id, content, model, generated_at, cached}`.
+`cached: false` means the model was just invoked; `cached: true` means
+this is a cheap re-read.
 
 ---
 
@@ -158,10 +176,13 @@ explainer before deciding whether to remediate.
 ### `organization [flags]`
 
 Single-endpoint command (no `get` verb). Shows the active org's tier,
-features, and overall instrumentation score.
+features, and overall instrumentation score. The `--json` envelope
+returns `data: {tier: {name, features}, score: {value, updated_at}}` —
+no top-level `name` field.
 
 ```bash
-ollygarden organization --json | jq '{name, tier, score}'
+ollygarden organization --json \
+  | jq '{tier: .data.tier.name, score: .data.score.value, features: .data.tier.features}'
 ```
 
 Use this as a quick "which org am I authed against" check.
@@ -286,7 +307,15 @@ with `webhooks deliveries list <id>` afterwards.
 | `--limit <n>` | 1-100, default 50. |
 | `--offset <n>` | ≥ 0. |
 
+Each delivery item: `id`, `webhook_config_id`, `insight_id`,
+`organization_id`, `status` (`success`/`failure`/…), `attempt_number`,
+`http_status_code` (nullable on TLS/network failures), `error_message`,
+`idempotency_key`, `created_at`, `completed_at`. `meta.total` is
+populated.
+
 ### `webhooks deliveries get <webhook-id> <delivery-id>`
 
-Full delivery record: status code, response body, retry count, latency.
-The thing to read when a webhook isn't reaching its endpoint.
+Full delivery record. The thing to read when a webhook isn't reaching
+its endpoint — `error_message` reveals TLS/network failures,
+`http_status_code` reveals receiver-side rejection, and
+`completed_at - created_at` reveals timeouts.
