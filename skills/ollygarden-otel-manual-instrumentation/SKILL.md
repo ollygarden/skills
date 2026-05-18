@@ -43,7 +43,7 @@ If a companion skill is unavailable:
 
 ## SDK Setup
 
-For SDK initialization, exporter, processor, propagator, and transport configuration, use the `ollygarden-sdk-setup` companion skill when available. If it is unavailable, apply these minimal defaults:
+For SDK initialization, exporter, processor, propagator, and transport configuration, use the `ollygarden-otel-sdk-setup` companion skill when available. If it is unavailable, apply these minimal defaults:
 - traces: OTLP exporter plus batch span processor
 - metrics: OTLP exporter plus periodic exporting metric reader
 - logs: OTLP exporter plus batching log record processor

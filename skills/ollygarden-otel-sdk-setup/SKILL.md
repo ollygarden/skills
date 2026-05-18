@@ -9,7 +9,7 @@ Use this skill when configuring or reviewing OpenTelemetry SDK initialization.
 
 Usage:
 - use `otel-sdk-versions` for version selection when available; otherwise use official release sources, setup docs, and source code
-- use `ollygarden-manual-instrumentation` for what to instrument once the SDK is set up
+- use `ollygarden-otel-manual-instrumentation` for what to instrument once the SDK is set up
 
 If a companion skill is unavailable:
 - do not stop

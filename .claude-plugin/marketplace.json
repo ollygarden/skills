@@ -9,32 +9,40 @@
   },
   "plugins": [
     {
+      "name": "ollygarden-cli",
+      "path": "skills/ollygarden-cli"
+    },
+    {
       "name": "ollygarden-insight-remediation",
-      "path": "skills/ollygarden/insight-remediation"
+      "path": "skills/ollygarden-insight-remediation"
     },
     {
       "name": "ollygarden-otel-declarative-config",
-      "path": "skills/otel/general/declarative-config"
+      "path": "skills/ollygarden-otel-declarative-config"
     },
     {
-      "name": "ollygarden-manual-instrumentation",
-      "path": "skills/otel/general/manual-instrumentation"
+      "name": "ollygarden-otel-instrumentation-planning",
+      "path": "skills/ollygarden-otel-instrumentation-planning"
     },
     {
-      "name": "ollygarden-sdk-setup",
-      "path": "skills/otel/general/sdk-setup"
+      "name": "ollygarden-otel-manual-instrumentation",
+      "path": "skills/ollygarden-otel-manual-instrumentation"
+    },
+    {
+      "name": "ollygarden-otel-sdk-setup",
+      "path": "skills/ollygarden-otel-sdk-setup"
     },
     {
       "name": "ollygarden-otel-go-setup",
-      "path": "skills/otel/go/setup"
+      "path": "skills/ollygarden-otel-go-setup"
     },
     {
       "name": "ollygarden-otel-java-setup",
-      "path": "skills/otel/java/setup"
+      "path": "skills/ollygarden-otel-java-setup"
     },
     {
       "name": "ollygarden-otel-js-setup",
-      "path": "skills/otel/js/setup"
+      "path": "skills/ollygarden-otel-js-setup"
     }
   ]
 }
