@@ -22,21 +22,64 @@ stable or near-stable implementations.
 
 For .NET and Python, fall back to environment variables or programmatic setup — declarative
 config is still in development. To check the current per-language status, fetch the SDK
-compatibility matrix listed in the `general/declarative-config` reference skill's Sources of Truth.
+compatibility matrix listed in the `otel-declarative-config` reference skill's Sources of Truth.
 
 ## Common Patterns
 
 These patterns describe the **shape** of a correct config. For exact field names and
-exporter syntax, fetch `examples/otel-sdk-config.yaml` (see the `general/declarative-config`
+exporter syntax, fetch `examples/otel-sdk-config.yaml` (see the `otel-declarative-config`
 reference skill's Sources of Truth) — those details vary by schema version.
 
-### One config file, vary with env vars
+### Resource attributes
+
+Every config MUST set these. They identify the service across all signals; without them
+telemetry reports as `unknown_service` and cannot be grouped or owned.
+
+| Attribute | Source | How |
+|---|---|---|
+| `service.name` | author-time, stable | literal |
+| `service.namespace` | author-time, stable | literal |
+| `service.owner.url` | author-time, stable | literal — the service's repository URL |
+| `service.version` | build-time, varies | `${SERVICE_VERSION:-unknown}` |
+| `deployment.environment.name` | deploy-time, varies | `${DEPLOYMENT_ENVIRONMENT_NAME:-unknown}` |
 
 ```yaml
 resource:
   attributes:
+    # Static — known at author time, identical across every deploy
+    - name: service.name
+      value: "checkout-service"
+    - name: service.namespace
+      value: "payments"
+    - name: service.owner.url
+      value: "https://github.com/acme/checkout-service"
+    # Injected — varies per build / environment
+    - name: service.version
+      value: "${SERVICE_VERSION:-unknown}"
     - name: deployment.environment.name
-      value: "${DEPLOY_ENV:-development}"
+      value: "${DEPLOYMENT_ENVIRONMENT_NAME:-unknown}"
+```
+
+**Rules:**
+
+- **Static values** (`service.name`, `service.namespace`, `service.owner.url`) are
+  hardcoded — they are stable per service. Do NOT route them through env vars; a missing
+  var silently degrades the value (e.g. to `unknown_service`).
+- **Injected values** (`service.version`, `deployment.environment.name`) use
+  `${VAR:-default}`. Declarative config cannot compute values — the env var must be
+  supplied at build/deploy time. Always include a `:-default` so the attribute is never empty.
+- **The env vars are a contract.** `SERVICE_VERSION` and `DEPLOYMENT_ENVIRONMENT_NAME`
+  must be wired into the runtime (CI build arg, container env, k8s manifest). That wiring
+  is the deployment layer's responsibility, not this config file's — but the config MUST
+  list which vars it expects.
+- **Do NOT set `service.instance.id`.** Omit it; let the SDK generate one per replica.
+  Hardcoding it makes every replica report the same id and corrupts per-instance metrics.
+- **Do NOT set `telemetry.sdk.*`, host, container, k8s, or process attributes.** Resource
+  detectors populate these automatically. Hardcoding produces wrong data.
+
+### One config file, vary with env vars
+
+```yaml
 tracer_provider:
   sampler:
     parent_based:
