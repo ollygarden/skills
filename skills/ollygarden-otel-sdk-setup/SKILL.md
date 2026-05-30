@@ -22,13 +22,18 @@ If a companion skill is unavailable:
 ## Non-Negotiable Rules
 
 - Use the latest compatible OpenTelemetry SDK or package for the project language. Delegate version choice to `otel-sdk-versions` or official release sources. When SDK behavior, setup details, or API surface is unclear, check official SDK docs and source code instead of relying on model memory.
-- If no SDK is set up yet, configure one for the signals in scope. Do not add signals beyond what the current task requires — each signal adds export, batching, and lifecycle overhead that is wasted if nothing produces telemetry for it.
+- If no SDK is set up yet, configure one for the signals in scope. Do not add signals beyond what the instrumentation plan or current task explicitly requires — each signal adds export, batching, and lifecycle overhead that is wasted if nothing produces telemetry for it.
+- Do not infer signal scope from generic SDK defaults. If traces, metrics, logs, propagators, or exporters are not clearly in scope, leave the item unresolved or prepare setup notes instead of enabling it.
+- Do not enable log export unless the plan/task includes a redaction/export policy.
+- Do not enable baggage unless the plan/task includes bounded allowlisted baggage keys or explicitly requires W3C baggage propagation.
+- Do not use unconditional production `always_on` sampling unless the plan/task explicitly allows it or documents downstream sampling that controls volume.
 - If an SDK is already present, reuse and extend it instead of replacing it. Adding a new signal to an existing setup is almost always safer than rewriting initialization.
 - Preserve existing exporter, processor, and transport choices when they are already intentional and compatible. Changing a working pipeline without a concrete reason risks breaking collection.
 
 ## Defaults
 
-Use these unless the project already has an intentional compatible alternative:
+Use these only after the plan/task establishes that the corresponding signal or
+propagator is in scope. If the plan/task is silent, do not enable the default.
 
 - traces: OTLP exporter plus batch span processor
 - metrics: OTLP exporter plus periodic exporting metric reader
@@ -44,7 +49,7 @@ These defaults align with the OTLP-first direction of the OpenTelemetry project 
 2. Determine which signals are in scope for the current task (traces, metrics, logs, or a combination).
 3. If no setup exists: configure providers, exporters, and processors for in-scope signals using the defaults above.
 4. If a setup exists: verify it covers in-scope signals. Extend if a needed signal is missing. Do not replace intentional choices.
-5. Verify the configuration matches the defaults or has an intentional reason to differ.
+5. Verify the configuration matches the plan/task scope. Defaults are acceptable only when they are in scope or have an intentional reason.
 6. Re-open the changed files and verify the result with evidence.
 
 ## Verification Contract
@@ -67,6 +72,9 @@ Use these items:
 - propagators are `tracecontext,baggage` or preserve an intentional existing alternative
 - transport uses SDK default or `http/protobuf`, or preserves an intentional existing alternative
 - no extra signals added beyond what the task requires
+- logs are not exported without a redaction/export policy
+- baggage is not enabled without bounded allowlisted keys or an explicit requirement
+- sampling follows the plan/task and avoids unapproved production `always_on`
 - existing SDK setup reused and extended, not replaced (when one was already present)
 - changed files were re-read
 - remaining risks or gaps are stated
