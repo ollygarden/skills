@@ -62,7 +62,7 @@ can build on what is already in place rather than recreating it.
 ### Step 2: Map and classify application boundaries
 
 List every runtime boundary, decide whether to include or exclude it, then classify
-included boundaries as auto-instrumented or manual.
+candidate boundaries as `auto`, `manual`, `auto + manual context`, or `excluded`.
 
 **2.1 — Identify all boundaries:**
 
@@ -89,9 +89,9 @@ For each boundary, ask: "Will this help debug a production issue?"
 
 Read `references/boundary-prioritization.md` for the full inclusion/exclusion framework.
 
-**2.3 — Classify each included boundary as `auto`, `manual`, `auto + manual context`, or `excluded`:**
+**2.3 — Classify each candidate boundary as `auto`, `manual`, `auto + manual context`, or `excluded`:**
 
-For each included boundary, determine the instrumentation strategy. Consult the
+For each candidate boundary, determine the instrumentation strategy. Consult the
 companion skills as knowledge sources:
 
 - **`auto`**: an instrumentation library or auto-instrumentation package covers this
