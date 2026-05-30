@@ -8,7 +8,7 @@ description: Plan Minimal Viable Instrumentation for a codebase. Use when starti
 This skill plans *what* to instrument and *why*, producing an actionable instrumentation plan
 tied to SLOs/SLIs. It does not generate code. Implementation mechanics — semconv lookups,
 SDK setup, language-specific instrumentation code — are handled by the
-`ollygarden-otel-manual-instrumentation` skill.
+manual, auto-instrumentation, SDK setup, and language-specific setup skills.
 
 ## Philosophy
 
@@ -49,6 +49,12 @@ Scan the repository to understand what exists before planning anything new.
    - **Background jobs**: async workers, queue consumers, cron tasks.
 5. Note the languages, frameworks, and libraries in use — these determine which
    instrumentation libraries are available and what auto-instrumentation covers.
+6. Identify business workflows from routes, handlers, jobs, consumers, and service calls:
+   - user-visible outcome
+   - entry point
+   - critical dependencies
+   - degraded states and fallbacks
+   - business milestones that need positive confirmation
 
 For brownfield codebases, list each existing instrumented boundary so that steps 2-6
 can build on what is already in place rather than recreating it.
@@ -56,7 +62,7 @@ can build on what is already in place rather than recreating it.
 ### Step 2: Map and classify application boundaries
 
 List every runtime boundary, decide whether to include or exclude it, then classify
-included boundaries as auto-instrumented or manual.
+candidate boundaries as `auto`, `manual`, `auto + manual context`, or `excluded`.
 
 **2.1 — Identify all boundaries:**
 
@@ -83,21 +89,43 @@ For each boundary, ask: "Will this help debug a production issue?"
 
 Read `references/boundary-prioritization.md` for the full inclusion/exclusion framework.
 
-**2.3 — Classify each included boundary as `auto` or `manual`:**
+**2.3 — Classify each candidate boundary as `auto`, `manual`, `auto + manual context`, or `excluded`:**
 
-For each included boundary, determine the instrumentation strategy:
+For each candidate boundary, determine the instrumentation strategy. Consult the
+companion skills as knowledge sources:
 
 - **`auto`**: an instrumentation library or auto-instrumentation package covers this
-  boundary type in the detected language/framework. The SDK setup phase configures it.
-  The implement phase writes NO code for it.
+  boundary type in the detected language/framework and the generated span explains the
+  production debugging question. The SDK setup/finalization phase configures it. The
+  implement phase writes NO manual boundary span for it.
 - **`manual`**: no instrumentation library covers this specific operation. The implement
   phase must add hand-written span code.
+- **`auto + manual context`**: auto-instrumentation covers the technical boundary, but
+  the trace would miss a business or degraded outcome unless code adds bounded context
+  to the current span or emits a bounded event. The implement phase must not duplicate
+  the auto span.
+- **`excluded`**: the boundary or service exists but is intentionally omitted,
+  suppressed, filtered, or downsampled because telemetry would be low-value, noisy,
+  sensitive, or unrelated to business workflows.
 
-Rule: if an auto-instrumentation library exists for the boundary type, classify it as
-`auto`. Only classify as `manual` when no library covers the specific operation.
+Rules:
+- If an auto-instrumentation library exists for a standard boundary type, prefer `auto`
+  or `auto + manual context`; do not create duplicate manual spans.
+- Use `manual` only when no auto library covers the specific operation or when the
+  operation is a business milestone/workflow boundary rather than a standard technical
+  boundary.
+- Use `excluded` for health checks, metrics/debug/static endpoints, low-value platform
+  traffic, DTO mapping, object conversion, validation helpers, utility functions, and
+  other implementation details.
 
 Read `references/boundary-prioritization.md` for a reference of which boundary types
 are commonly auto-instrumented across languages.
+
+Also apply the universal guidance from:
+- `ollygarden-otel-auto-instrumentation` for auto-instrumentation scope, tuning,
+  suppressions, duplication avoidance, sensitive capture risks, and volume/noise.
+- `ollygarden-otel-manual-instrumentation` for manual boundary quality, signal choice,
+  propagation, cardinality, and error ownership.
 
 ### Step 3: Select signals and plan error handling per boundary
 
@@ -122,6 +150,15 @@ Common signal combinations:
 Apply the error golden rule from the reference: record errors on spans using status
 and events, do not create separate error metrics that duplicate what span-derived
 metrics already provide.
+
+Also define the overall signal scope for SDK setup:
+- traces: in scope or out of scope
+- metrics: in scope, standard/SLO-only, or out of scope
+- logs: in scope only when a redaction/export policy is stated
+- baggage: in scope only when bounded allowlisted keys are stated
+
+Do not leave signal scope implicit. SDK setup must be able to tell which providers,
+exporters, propagators, and processors are allowed.
 
 **3.2 — Error handling (manual boundaries only):**
 
@@ -154,6 +191,11 @@ For each instrumented boundary, define the attributes to capture and check cardi
    (backends handle high-cardinality span attributes) but dangerous on metrics.
 6. Ensure every metric has only LOW or MEDIUM cardinality attributes. If a metric
    needs a HIGH cardinality dimension, move that dimension to a span attribute instead.
+7. Review PII and sensitive data risks for each signal source. Explicitly forbid raw
+   personal data, credentials, tokens, cookies, authorization headers, request/response
+   bodies, message payloads, raw exception messages, raw IDs, timestamps, and other
+   unbounded values unless the plan states a safe transformation such as redaction,
+   aggregation, or hashing.
 
 ### Step 5: Define target SLOs/SLIs
 
@@ -186,11 +228,14 @@ Assemble the final output using the template below.
    individual sections with all required fields.
 3. Include the gaps and risks section — be honest about what the plan does not cover,
    what cardinality risks exist, and where signal choices are uncertain.
-4. If the codebase is brownfield, note which boundaries are already instrumented and
+4. Include SDK setup constraints derived from the plan. The SDK/setup phase needs these
+   constraints to avoid enabling extra services, signals, exporters, propagators, or
+   auto-instrumentation beyond the MVI.
+5. If the codebase is brownfield, note which boundaries are already instrumented and
    whether the existing instrumentation is sufficient or needs changes.
-5. Do not include implementation notes, recommended implementation order, context
-   propagation strategy, or framework-specific advice. The plan specifies *what* to
-   instrument, not *how* to implement it.
+6. Do not include framework-specific code snippets or language-specific wiring. The plan
+   specifies observability decisions and SDK constraints. Language-specific mechanics are
+   handled by setup skills.
 
 ## Output Template
 
@@ -205,6 +250,12 @@ Produce the plan in the following structure:
 - **Languages/frameworks**: {e.g., TypeScript with NestJS, Go with net/http}
 - **Package manager**: {npm | bun | yarn | pnpm | go | maven | gradle}
 
+## Business Workflows
+
+| Workflow | User outcome | Entry point | Critical dependencies | Degraded states | Trace expectation |
+|----------|--------------|-------------|-----------------------|-----------------|-------------------|
+| {workflow.name} | {what the user/business expects} | {route/job/consumer} | {services/dependencies} | {fallbacks/retries/partial success} | {what should be understandable from the trace} |
+
 ## Target SLOs
 
 | SLO | Target | SLI | Derivable from spans? |
@@ -212,14 +263,30 @@ Produce the plan in the following structure:
 | Availability | 99.9% success | 5xx error rate at HTTP boundary | Yes |
 | Latency | P99 < 500ms | Request duration at HTTP boundary | Yes |
 
+## Services In Scope
+
+| Service | Include? | Role | Reason | SDK strategy | Signals |
+|---------|----------|------|--------|--------------|---------|
+| {service-name} | {yes/no/low-priority} | {business/control-plane/worker} | {why this service does or does not help production debugging} | {agent/library/manual/none} | {traces/metrics/logs/none} |
+
+## Signal Scope
+
+| Signal | Enabled? | Scope | Reason | Guardrails |
+|--------|----------|-------|--------|------------|
+| Traces | {yes/no} | {services/boundaries} | {debugging value} | {sampling and suppression constraints} |
+| Metrics | {yes/no/standard-only/SLO-only} | {services/boundaries} | {SLI/dashboard value} | {low-cardinality dimensions only} |
+| Logs | {yes/no} | {services/events} | {diagnostic value} | {redaction/export policy, or "do not configure logger provider"} |
+| Baggage | {yes/no} | {allowlisted keys or "none"} | {why values must propagate} | {bounded, non-sensitive values only} |
+
 ## Auto-Instrumented Boundaries
 
 These are handled by instrumentation libraries configured during SDK setup.
-The implement phase MUST NOT write manual code for these.
+The implement phase MUST NOT write manual spans for these. If manual context is needed,
+list the target as `auto + manual context` and specify the context separately.
 
-| Boundary | Library | Covers |
-|----------|---------|--------|
-| {e.g., HTTP server requests} | {e.g., instrumentation-http, instrumentation-express} | {e.g., Inbound request spans with method, route, status} |
+| Service | Boundary | Decision | Library/agent | Covers | Tuning / suppressions | Sensitive data risks | Volume/noise risk |
+|---------|----------|----------|---------------|--------|----------------------|----------------------|-------------------|
+| {service} | {e.g., HTTP server requests} | {auto/auto + manual context/excluded} | {e.g., Java agent} | {method, route, status} | {health suppression, header/body capture disabled, etc.} | {headers, path IDs, payloads, etc.} | {low/medium/high plus rationale} |
 
 ## Manual Boundaries
 
@@ -228,14 +295,46 @@ Each boundary below requires hand-written span code.
 ### {boundary-name}
 - **File**: `{path/to/file}`
 - **Function**: `{methodName()}`
-- **Span name**: `{operation.name}`
-- **Signal**: {Span | Span + Metric | Span + Event}
-- **Attributes**: `{attribute.name}` ({LOW|MEDIUM|HIGH}), ...
-- **On error**: Set span status to ERROR. Record exception via Logs API. Set `error.type`.
+- **Strategy**: {manual | auto + manual context}
+- **Create new span**: {yes/no}
+- **Signal**: {Span | current-span attributes | Metric | Log/Event | Nothing}
+- **Attributes**: `{attribute.name}` ({LOW|MEDIUM|HIGH}, PII risk: {none/low/medium/high}, reason: ...)
+- **Events/logs**: {none, or exact event name and bounded fields}
+- **On error**: {set status behavior, exception/error category behavior, handled-error behavior}
+- **Do not record**: {raw IDs, raw messages, payloads, headers, etc.}
 - **SLI coverage**: {which SLO this supports, or "Production debugging"}
 
 ### {next-boundary-name}
 ...
+
+## PII And Sensitive Data Policy
+
+| Source | Risk | Decision |
+|--------|------|----------|
+| {source, e.g., HTTP path params, headers, Kafka payloads, exception messages} | {PII/security/business/cardinality risk} | {remove/redact/hash/aggregate/route-template-only/do not capture} |
+
+## Noise, Volume, And Cost Risks
+
+| Source | Risk | Decision |
+|--------|------|----------|
+| {source, e.g., health checks, high-volume consumer, control-plane service} | {why it creates cost/noise} | {exclude/downsample/suppress/keep with rationale} |
+
+## Propagation Policy
+
+- **Trace context**: {required/not applicable, boundaries}
+- **Baggage**: {disabled, or allowlisted keys with rationale}
+- **Messaging propagation**: {required/not applicable, destination headers/properties at a conceptual level}
+
+## SDK Setup Constraints
+
+- **Services to configure**: {list}
+- **Services not to configure or lower priority**: {list with rationale}
+- **Allowed signals**: {traces/metrics/logs}
+- **Disallowed signals**: {logs, baggage, etc. with rationale}
+- **Sampling**: {parent-based ratio, collector tail sampling dependency, non-production always_on, or unresolved}
+- **Required suppressions**: {health/readiness/metrics/debug/static/control-plane/noisy auto-instrumentations}
+- **Sensitive capture restrictions**: {headers, bodies, payloads, raw SQL, raw exception messages}
+- **Required env vars**: {endpoint, service version, environment, sampling ratio, etc.}
 
 ## Excluded Boundaries
 - {boundary} — {one-line reason, e.g., "health check, no diagnostic value"}
@@ -244,17 +343,28 @@ Each boundary below requires hand-written span code.
 - {Any SLI not covered by the plan}
 - {Any cardinality risks flagged}
 - {Any boundaries where signal choice is uncertain}
+- {Any SDK setup constraint that is unresolved}
+- {Any PII/noise/volume risk that implementation must preserve}
+
+## Verification Checklist
+- [ ] Business workflows above are understandable from the resulting traces.
+- [ ] SDK setup configures only the services and signals allowed by this plan.
+- [ ] Logs are not exported unless this plan includes a redaction/export policy.
+- [ ] Baggage is not enabled unless this plan includes bounded allowlisted keys.
+- [ ] Sampling follows the plan and does not use production `always_on` unless explicitly justified.
+- [ ] Health/readiness/metrics/debug/static endpoints are suppressed, filtered, downsampled, or explicitly accepted.
+- [ ] Manual spans do not duplicate auto-instrumented HTTP, DB, RPC, messaging, or cache spans.
+- [ ] No PII, credentials, payloads, raw IDs, raw exception messages, or unbounded values are recorded.
+- [ ] Custom attributes have stated cardinality and investigation value.
 ````
 
 ### What NOT to include in the plan
 
-- **No implementation notes or framework advice.** The plan specifies boundaries and
-  their instrumentation requirements. How to implement them is the job of the
-  `ollygarden-otel-manual-instrumentation` skill.
+- **No language-specific code snippets or framework wiring.** The plan specifies
+  observability decisions and SDK constraints. How to wire those decisions in a
+  language is the job of the setup and implementation skills.
 - **No recommended implementation order.** Everything in the plan gets implemented.
 - **No phased rollout or tier labels.** The plan is the MVI — the complete set of
   boundaries needed for production debugging. There are no "Phase 2" boundaries.
-- **No context propagation strategy section.** Context propagation is an implementation
-  concern handled by auto-instrumentation libraries and the SDK.
 - **No free-form "Details" prose per boundary.** Use the structured fields above.
   If something doesn't fit in the fields, it probably doesn't belong in the plan.

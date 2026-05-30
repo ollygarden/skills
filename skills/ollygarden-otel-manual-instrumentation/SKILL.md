@@ -35,8 +35,11 @@ If a companion skill is unavailable:
 2. For each instrumentation point, decide:
    - the runtime boundary
    - the signal
+   - whether to create a new span, annotate the current span, emit a metric/event, or do nothing
    - the semantic convention group if one exists
    - the key attributes and cardinality risks
+   - PII and sensitive data risks
+   - whether auto-instrumentation already covers the technical boundary
    - the propagation requirements
 3. Implement or review the code.
 4. Re-open the changed files and verify the result with evidence.
@@ -49,6 +52,25 @@ For SDK initialization, exporter, processor, propagator, and transport configura
 - logs: OTLP exporter plus batching log record processor
 - propagators: `tracecontext,baggage`
 - if no SDK exists, configure one; if one exists, reuse it; do not add extra signals
+
+These defaults are fallback mechanics only. They do not override the instrumentation
+plan. Do not use them to add signals, exporters, propagators, or services outside the
+plan/task scope. Logs require an explicit redaction/export policy, and baggage requires
+intentional bounded keys.
+
+## Planning Mode Output
+
+When this skill is used during instrumentation planning, record the decisions that the
+implementer must not guess:
+
+- why the instrumentation point is a meaningful runtime boundary
+- whether auto-instrumentation already covers the technical boundary
+- whether the implementation should create a new span or annotate existing context
+- exact signal choice: span, current-span attributes, metric, log/event, or nothing
+- attributes with cardinality and PII risk
+- sensitive values that must not be recorded
+- error ownership and handled-error behavior
+- propagation requirements, or why propagation is not applicable
 
 ## References To Load On Demand
 
