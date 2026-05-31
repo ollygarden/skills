@@ -94,6 +94,25 @@ Always use the BOM to align dependency versions.
 - **BOM alignment**: Always import `opentelemetry-bom` to prevent version conflicts.
 - **API at compile, SDK at runtime**: Depend on `opentelemetry-api` at compile scope, SDK/exporter at runtime. This keeps application code decoupled from SDK internals.
 
+## Anti-Patterns
+
+### Agent jar / flag / config path drift
+
+The jar baked into the image, the `-javaagent:<jar-path>` flag, and
+`-Dotel.config.file=<yaml-path>` form one contract — all three paths must resolve at
+runtime. The failure mode is splitting them across layers:
+
+- If the launch flags come from a deploy-layer env var (e.g. `JAVA_TOOL_OPTIONS` in a
+  Kubernetes manifest), that var **overrides** the image's own `ENV` — so a manifest can
+  point `-javaagent` at a jar the image never installed.
+- A rename or half-reverted change that updates the flag but not the jar (or vice versa)
+  yields `agent library failed to load` / `Error opening zip file or JAR manifest missing`
+  and a JVM crash loop on every pod.
+
+Keep the jar download, the `otel.yaml` copy, and the launch flag in the **same image
+layer** (the Dockerfile). Do not let a manifest re-specify the agent path unless it also
+guarantees the jar exists at that path.
+
 ## Cross-References
 
 - Reference: `otel-java` skill — `references/declarative-setup.md` for the Javaagent fetch table, activation flags, manual instrumentation API, agent-only properties.
