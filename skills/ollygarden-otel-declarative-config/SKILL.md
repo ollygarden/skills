@@ -98,6 +98,45 @@ headers:
 endpoint: "${OTEL_ENDPOINT}"
 ```
 
+### Dropping health-check / probe spans
+
+When the instrumentation plan marks endpoints as `excluded` (health, readiness, and
+liveness probes — see `ollygarden-otel-instrumentation-planning`), the declarative
+mechanism is a **composite sampler that drops matching spans**. Do NOT reach for
+`OTEL_INSTRUMENTATION_*` exclude-path env vars — they are ignored when a config file is
+active (see *Mixing env vars and config file* below).
+
+Nest a rule-based routing sampler as the `root` of `parent_based`, keeping your normal
+ratio sampler as its fallback:
+
+```yaml
+tracer_provider:
+  sampler:
+    parent_based:
+      root:
+        rule_based_routing:
+          fallback_sampler:           # used when no rule matches
+            trace_id_ratio_based:
+              ratio: ${SAMPLE_RATE:-1.0}
+          span_kind: SERVER           # only inbound server spans
+          rules:
+            - action: DROP            # DROP or RECORD_AND_SAMPLE
+              attribute: url.path     # match the request path
+              pattern: /health.*    # align with the plan's probe path list (e.g /actuator /health /ready etc.)
+```
+
+**Rules:**
+
+- Nest inside `parent_based.root` so only root spans are evaluated — upstream sampling
+  decisions still propagate to downstream services.
+- `span_kind: SERVER` keeps client/producer/consumer spans untouched.
+- Align `pattern` with the exclusion path list in the instrumentation plan
+  (`/health`, `/healthz`, `/actuator/*`, etc.).
+- Availability is per-runtime — confirm the composite/rule-based sampler is supported by
+  the target SDK or agent, and fetch exact field names from the canonical example (see the
+  `otel-declarative-config` reference skill's Sources of Truth). For language-specific
+  availability and agent details, see the relevant `ollygarden-otel-*-setup` skill.
+
 ## Anti-Patterns
 
 ### Missing `parent_based` wrapper
@@ -146,10 +185,17 @@ headers:
 ### Mixing env vars and config file
 
 ```bash
-# BAD: OTEL_TRACES_SAMPLER is ignored when OTEL_CONFIG_FILE is set
+# BAD: when a config file is set, OTEL_* knobs are IGNORED — sampling,
+#      instrumentation exclude-patterns, propagators, everything.
 export OTEL_CONFIG_FILE="/app/otel.yaml"
-export OTEL_TRACES_SAMPLER="always_off"  # This has NO effect
+export OTEL_TRACES_SAMPLER="always_off"              # NO effect
+export OTEL_INSTRUMENTATION_HTTP_EXCLUDE_PATTERNS="" # NO effect (any OTEL_INSTRUMENTATION_*)
 ```
+
+With the exception of `${VAR}` substitution **inside** the YAML, the SDK ignores
+environment variables when a config file is active. Anything you would normally set via
+`OTEL_*` must move into the config file — health-check exclusion becomes the
+`rule_based_routing` sampler above, not an env var.
 
 ## Cross-References
 
