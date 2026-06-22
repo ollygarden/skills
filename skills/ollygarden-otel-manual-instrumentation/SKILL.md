@@ -26,8 +26,9 @@ If a companion skill is unavailable:
 - Choose the signal before writing code. Use spans for request or operation flow, metrics for aggregate recurring questions, logs or events for discrete diagnostic facts, and nothing when telemetry would be noise. See `references/signal-selection.md`.
 - For any known boundary type such as `http`, `db`, `messaging`, or `rpc`, check the released semantic conventions before choosing names or attributes. Derive semconv-governed span names directly from the released naming rule. Do not add custom prose, protocol labels, hostnames, product names, or business hints to semconv-governed span names. If no released key exists, use a stable custom namespace and keep values bounded.
 - Keep values bounded. Prefer method, route template, status code, operation name, destination name, region, deployment environment, or customer tier. Avoid raw user IDs, full URLs, raw SQL in metrics, free-form messages, and timestamps as dimensions.
+- Never record raw SQL statement text with inlined parameter values on any signal — spans included. Bound parameters routinely carry PII (emails, names, tokens). Disable statement-value capture in the instrumentation (e.g. parameterize `db.query.text`) or redact it; prefer parameterized text like `INSERT INTO users (...) VALUES (?, ?, ?)`.
 - Record failure on the span that owns the final failed outcome. Do not mark the final span as failed if retries succeed. Do not treat handled errors as terminal failures. See `references/boundaries.md`.
-- Preserve trace context across network and async boundaries. Extract inbound context, inject outbound context, and use baggage only when it is intentional and bounded. See `references/propagation.md`.
+- Preserve trace context across network, async, and internal call boundaries. Extract inbound context, inject outbound context, and thread the active context into every DB/client call so its span stays attached. Use baggage only when it is intentional and bounded. See `references/propagation.md`.
 
 ## Workflow
 

@@ -191,5 +191,5 @@ func main() {
 
 ## Cross-References
 
-- Reference: `otel-go` skill — `references/declarative-setup.md` for `otelconf` fetch table, import path facts, schema version mapping; `references/breaking-changes.md` for SDK/contrib upgrade audits.
+- Reference: `otel-go` skill — `references/declarative-setup.md` for `otelconf` fetch table, import path facts, schema version mapping; `references/breaking-changes.md` for SDK/contrib upgrade audits; `references/instrumentation-libraries.md` for wiring DB/HTTP/gRPC libraries, threading `context.Context` into the data layer (avoid detached CLIENT-root DB spans), and keeping PII out of `db.query.text`.
 - General conventions: `ollygarden-otel-declarative-config` — anti-patterns and common YAML patterns.
