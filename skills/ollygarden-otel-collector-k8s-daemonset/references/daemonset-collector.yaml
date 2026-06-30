@@ -48,19 +48,18 @@ receivers:
         type: container # parse CRI/containerd/docker, set k8s.* metadata
 
   # --- Node + pod resource metrics ----------------------------------------
-  kubeletstats:
+  # Split into two receiver instances over disjoint metric_groups at different
+  # collection_intervals: the slow-changing volume group scrapes at 1/3 the rate
+  # of the cpu/memory utilization metrics. Same receiver, no extra processors —
+  # OllyGarden's preferred "Pattern A" DPM reduction. Do NOT instead raise the
+  # interval on a single receiver: that also downsamples the high-information
+  # cpu/memory series. See remediation-metric-dpm-reduction.
+  kubeletstats/main:
     collection_interval: 20s
     auth_type: serviceAccount
     endpoint: ${env:K8S_NODE_NAME}:10250
     insecure_skip_verify: true
-    # Drop deprecated volume resource attributes — pure noise/cardinality.
-    resource_attributes:
-      aws.volume.id: {enabled: false}
-      fs.type: {enabled: false}
-      gce.pd.name: {enabled: false}
-      glusterfs.endpoints.name: {enabled: false}
-      glusterfs.path: {enabled: false}
-      partition: {enabled: false}
+    metric_groups: [container, pod, node] # volume is the slow instance's job
     metrics:
       # Curated allowlist: usage + utilization only. Everything not listed
       # here that is off-by-default stays off.
@@ -72,8 +71,28 @@ receivers:
       k8s.pod.memory_limit_utilization: {enabled: true}
       k8s.pod.memory_request_utilization: {enabled: true}
 
+  kubeletstats/volume:
+    collection_interval: 60s # volume capacity/usage barely moves — 3× fewer DP
+    auth_type: serviceAccount
+    endpoint: ${env:K8S_NODE_NAME}:10250
+    insecure_skip_verify: true
+    metric_groups: [volume]
+    # k8s.volume.type is what lets filter/drop_static_volume_mounts (below)
+    # discard secret/configMap/downwardAPI/projected-SA-token volume stats.
+    extra_metadata_labels: [k8s.volume.type]
+    # Drop deprecated volume resource attributes — pure noise/cardinality.
+    resource_attributes:
+      aws.volume.id: {enabled: false}
+      fs.type: {enabled: false}
+      gce.pd.name: {enabled: false}
+      glusterfs.endpoints.name: {enabled: false}
+      glusterfs.path: {enabled: false}
+      partition: {enabled: false}
+
   # --- Host metrics -------------------------------------------------------
-  hostmetrics:
+  # Pattern A again: filesystem capacity is near-static, so it goes to a 300s
+  # instance while cpu/memory utilization stay at 60s.
+  hostmetrics/fast:
     collection_interval: 60s # 60s, not 10s — host metrics rarely need finer
     root_path: /hostfs
     scrapers:
@@ -87,6 +106,11 @@ receivers:
         metrics:
           system.memory.usage: {enabled: false}
           system.memory.utilization: {enabled: true}
+
+  hostmetrics/slow:
+    collection_interval: 300s # filesystem capacity is near-static
+    root_path: /hostfs
+    scrapers:
       filesystem:
         metrics:
           system.filesystem.usage: {enabled: false}
@@ -167,6 +191,33 @@ receivers:
               replacement: $1:$2
               target_label: __address__
 
+        # Cluster-singleton metadata (kube-state-metrics): secret, configmap,
+        # serviceaccount-token, and *_info/_labels/_limits/_requests gauges are
+        # near-static — scrape them at 5m, not 30s. This is the worked
+        # secrets/configmaps/tokens DPM-reduction example. NOTE: kube-state-metrics
+        # is a single cluster-wide pod, so only the agent on its node scrapes it;
+        # for a large fleet prefer scraping KSM once from the gateway/cluster
+        # collector instead (see Out of scope in SKILL.md). The fast KSM status
+        # metrics, if you want them, belong in a separate 30s job.
+        - job_name: kube-state-metrics-metadata
+          scrape_interval: 5m
+          scrape_timeout: 30s
+          kubernetes_sd_configs:
+            - role: pod
+              selectors:
+                - role: pod
+                  field: spec.nodeName=${env:K8S_NODE_NAME}
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+              regex: kube-state-metrics
+              action: keep
+          metric_relabel_configs:
+            # Keep only the slow metadata families — this is where kube_secret_*,
+            # kube_configmap_*, and kube_serviceaccount_* live.
+            - source_labels: [__name__]
+              regex: kube_secret_.*|kube_configmap_.*|kube_serviceaccount_.*|kube_.*_info|kube_.*_labels|kube_.*_limits|kube_.*_requests|kube_.*_owner
+              action: keep
+
 processors:
   # ALWAYS first in every pipeline. Applies backpressure before buffers are
   # allocated, so a traffic spike sheds load instead of OOM-killing the pod.
@@ -191,6 +242,12 @@ processors:
   k8sattributes:
     auth_type: serviceAccount
     passthrough: false
+    # Scope the informer to THIS node's pods. On a DaemonSet this is the
+    # difference between every replica watching every pod in the cluster and
+    # each replica watching only its own node — a large memory saving at scale.
+    # The value is the NAME of the env var holding the node name, not its value.
+    filter:
+      node_from_env_var: K8S_NODE_NAME
     extract:
       metadata:
         - k8s.namespace.name
@@ -228,6 +285,26 @@ processors:
           not IsMatch(resource.attributes["k8s.namespace.name"],
             "^(my-app|payments|checkout)$")
 
+  # Drop per-volume stats for non-durable mount types. secret / configMap /
+  # downwardAPI / projected serviceaccount-token volumes have static capacity
+  # that never moves, so emitting k8s.volume.* for them is pure DPM waste —
+  # and dropping is cheaper than slow-scraping. Requires extra_metadata_labels:
+  # [k8s.volume.type] on the kubeletstats/volume receiver (set above). The last
+  # clause catches the projected SA-token volume, which has no k8s.volume.type
+  # but a well-known kube-api-access-* name.
+  filter/drop_static_volume_mounts:
+    error_mode: ignore
+    metrics:
+      datapoint:
+        - resource.attributes["k8s.volume.type"] == "configMap"
+        - resource.attributes["k8s.volume.type"] == "secret"
+        - resource.attributes["k8s.volume.type"] == "downwardAPI"
+        - resource.attributes["k8s.volume.type"] == "emptyDir"
+        - >-
+          resource.attributes["k8s.volume.name"] != nil and
+          resource.attributes["k8s.volume.type"] == nil and
+          IsMatch(resource.attributes["k8s.volume.name"], "^kube-api-access-")
+
   # Noise drops. CUSTOMIZE to your actual probe routes / log severities.
   # Health/readiness probe spans and sub-INFO logs are rarely worth storing;
   # health probes alone have been measured at ~28% of all spans in some fleets.
@@ -237,11 +314,19 @@ processors:
     error_mode: ignore
     traces:
       span:
+        # Probe path can land on http.route (stable), url.path (current semconv),
+        # or the deprecated http.target depending on the instrumentation — cover
+        # all three. error_mode: ignore skips the clause when the attribute is nil.
         - 'IsMatch(attributes["http.route"], "^/(health|healthz|readyz|livez|actuator/health)$")'
+        - 'IsMatch(attributes["url.path"], "^/(health|healthz|readyz|livez|actuator/health)$")'
+        - 'IsMatch(attributes["http.target"], "^/(health|healthz|readyz|livez|actuator/health)(\\?.*)?$")'
         # Word-anchored so it catches "HealthController.health" but not, say,
         # "PatientHealthRecordController.get". OTTL string literals process Go
         # escapes, so the backslash is doubled here: "\\b" -> RE2 \b (boundary).
         - 'IsMatch(name, "(?i)\\b(health|healthz|readiness|liveness)\\b")'
+        # Some frameworks name the probe span after the handler method with no
+        # "health" token at all (e.g. getStatus / isReady) — match those exactly.
+        - 'name == "getStatus" or name == "isReady"'
     logs:
       log_record:
         - 'severity_number < SEVERITY_NUMBER_INFO'
@@ -344,13 +429,14 @@ service:
       exporters: [otlp]
 
     metrics:
-      receivers: [otlp, kubeletstats, hostmetrics, prometheus]
+      receivers: [otlp, kubeletstats/main, kubeletstats/volume, hostmetrics/fast, hostmetrics/slow, prometheus]
       processors:
         - memory_limiter
         - k8sattributes
         - resourcedetection
         - resource/clustername
         - filter/only_monitored_namespaces
+        - filter/drop_static_volume_mounts
         - transform/prometheus_service_attributes
         - transform/truncate_resources
         - batch
