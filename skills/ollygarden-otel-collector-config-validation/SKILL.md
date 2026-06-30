@@ -158,7 +158,7 @@ $RUNTIME run -d --rm --name otelcol-verify \
   --user "$(id -u):$(id -g)" \
   -v "$(pwd)/harness.yaml:/etc/otelcol-contrib/config.yaml:ro$SEL" \
   -v "$(pwd)/out:/output$SEL" \
-  otel/opentelemetry-collector-contrib:0.142.0 \
+  otel/opentelemetry-collector-contrib:0.155.0 \
   --config=/etc/otelcol-contrib/config.yaml
 
 # wait until the collector reports ready, then feed it. Grepping the runtime's own
@@ -182,6 +182,11 @@ Two runtime caveats:
   on Linux. On **Docker Desktop (macOS/Windows)** host networking is limited; instead publish
   the port (`-p 4317:4317`) and keep targeting `localhost:4317`, or run telemetrygen as a second
   container on a shared network.
+- **Pin a recent release tag** — `0.155.0` above is illustrative; use the current released
+  version so the component under test behaves as it will in production. Mind the tag formats:
+  the Docker Hub `otel/opentelemetry-collector-contrib` image is **unprefixed** (`:0.155.0`),
+  while the ghcr `telemetrygen` image is **`v`-prefixed** (`:v0.155.0`). See `otel-telemetrygen`
+  for the telemetrygen image.
 
 ### Stage 5 — Assert the output
 
