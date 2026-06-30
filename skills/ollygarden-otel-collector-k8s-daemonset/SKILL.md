@@ -24,7 +24,7 @@ Use it for the **agent tier**: a DaemonSet collector that ingests OTLP from work
 node and scrapes node-local sources (kubelet, host, same-node pods, pod log files). It does
 **not** cover the **gateway/cluster tier** — a separate Deployment (often a singleton) that
 runs `k8s_cluster`/`k8s_events`, tail sampling, and load balancing. Two things that belong
-there, not here, are called out in [Out of scope](#out-of-scope).
+there, not here, are called out in the [Out of scope](#out-of-scope) section.
 
 ## The core principle: drop early, drop at the node
 
@@ -131,7 +131,9 @@ highest-cardinality internal series with metric `views` (e.g. `otelcol.k8s.pod.a
 `http.*`/`rpc.*` client/server histograms), and report on a 30s reader. You want to see queue
 depth and refusals without the agent's self-telemetry becoming its own cost line.
 
-## Out of scope (belongs in the gateway/cluster collector)
+## Out of scope
+
+These belong in the gateway/cluster collector, not the node agent:
 
 - **Tail sampling and load balancing.** A whole-trace keep/drop decision needs every span of
   a trace in one place; on a node agent you only have the local spans. Run `tail_sampling`
@@ -144,7 +146,7 @@ depth and refusals without the agent's self-telemetry becoming its own cost line
 
 Validate the config against the collector binary that will run it:
 
-```
+```sh
 otelcol-contrib validate --config references/daemonset-collector.yaml
 ```
 

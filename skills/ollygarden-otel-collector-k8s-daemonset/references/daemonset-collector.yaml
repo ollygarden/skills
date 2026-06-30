@@ -12,6 +12,9 @@
 extensions:
   # Durable filelog offsets survive restarts, so pod logs are not re-read from
   # the start after a collector restart (avoids duplicate log records).
+  # CUSTOMIZE: back this directory with a hostPath/PVC in the DaemonSet. If it
+  # lives only on the container filesystem, a pod recreate loses the offsets and
+  # `start_at: end` then skips any logs written while the collector was down.
   file_storage/filelog_offsets:
     directory: /var/lib/otelcol/file_storage
     create_directory: true
@@ -125,6 +128,18 @@ receivers:
             - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
               regex: "true"
               action: keep
+            # Honor the standard prometheus.io/{scheme,path,port} annotations so
+            # pods on non-default endpoints are scraped correctly.
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scheme]
+              regex: (https?)
+              target_label: __scheme__
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+              regex: (.+)
+              target_label: __metrics_path__
+            - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+              regex: ([^:]+)(?::\d+)?;(\d+)
+              replacement: $1:$2
+              target_label: __address__
 
         - job_name: kubernetes-pods-slow # expensive endpoints, scraped rarely
           scrape_interval: 5m
@@ -141,6 +156,16 @@ receivers:
             - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape_slow]
               regex: "true"
               action: keep
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scheme]
+              regex: (https?)
+              target_label: __scheme__
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+              regex: (.+)
+              target_label: __metrics_path__
+            - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+              regex: ([^:]+)(?::\d+)?;(\d+)
+              replacement: $1:$2
+              target_label: __address__
 
 processors:
   # ALWAYS first in every pipeline. Applies backpressure before buffers are
