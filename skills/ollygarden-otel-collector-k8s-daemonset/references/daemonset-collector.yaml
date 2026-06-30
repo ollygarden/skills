@@ -280,18 +280,24 @@ processors:
     error_mode: ignore
     metrics:
       datapoint:
+        # Keep cluster-level kube-state-metrics (kube_*) regardless of namespace:
+        # the Prometheus receiver stamps them with the KSM pod's OWN namespace,
+        # which is rarely in the workload allowlist, so without this guard the
+        # kube-state-metrics-metadata scrape would be silently dropped here.
         - >-
           resource.attributes["k8s.namespace.name"] != nil and
+          not IsMatch(metric.name, "^kube_") and
           not IsMatch(resource.attributes["k8s.namespace.name"],
             "^(my-app|payments|checkout)$")
 
-  # Drop per-volume stats for non-durable mount types. secret / configMap /
-  # downwardAPI / projected serviceaccount-token volumes have static capacity
-  # that never moves, so emitting k8s.volume.* for them is pure DPM waste —
-  # and dropping is cheaper than slow-scraping. Requires extra_metadata_labels:
-  # [k8s.volume.type] on the kubeletstats/volume receiver (set above). The last
-  # clause catches the projected SA-token volume, which has no k8s.volume.type
-  # but a well-known kube-api-access-* name.
+  # Drop per-volume stats for read-only, static mount types. secret / configMap
+  # / downwardAPI / projected serviceaccount-token volumes have capacity that
+  # never moves, so emitting k8s.volume.* for them is pure DPM waste — and
+  # dropping is cheaper than slow-scraping. NOT emptyDir: it is writable
+  # ephemeral storage whose usage is a real disk-pressure signal, so it is kept.
+  # Requires extra_metadata_labels: [k8s.volume.type] on the kubeletstats/volume
+  # receiver (set above). The last clause catches the projected SA-token volume,
+  # which has no k8s.volume.type but a well-known kube-api-access-* name.
   filter/drop_static_volume_mounts:
     error_mode: ignore
     metrics:
@@ -299,7 +305,6 @@ processors:
         - resource.attributes["k8s.volume.type"] == "configMap"
         - resource.attributes["k8s.volume.type"] == "secret"
         - resource.attributes["k8s.volume.type"] == "downwardAPI"
-        - resource.attributes["k8s.volume.type"] == "emptyDir"
         - >-
           resource.attributes["k8s.volume.name"] != nil and
           resource.attributes["k8s.volume.type"] == nil and
@@ -354,7 +359,7 @@ processors:
     metric_statements:
       - context: resource
         statements:
-          - delete_key(attributes, "service.name") where attributes["service.name"] != nil and IsMatch(attributes["service.name"], "^kubernetes-pods")
+          - delete_key(attributes, "service.name") where attributes["service.name"] != nil and IsMatch(attributes["service.name"], "^(kubernetes-pods|kube-state-metrics)")
           - delete_key(attributes, "service.instance.id") where attributes["service.instance.id"] != nil and IsMatch(attributes["service.instance.id"], ":[0-9]+$")
 
   # LAST transform on every pipeline. Bound resource attribute values that can

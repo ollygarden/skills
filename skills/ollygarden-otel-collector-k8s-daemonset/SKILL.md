@@ -70,8 +70,10 @@ Metrics volume is driven by **series count × datapoints-per-minute**. Attack bo
   that barely move.
 - **Drop static-volume metrics (secrets, configmaps, serviceaccount tokens).** kubeletstats
   emits `k8s.volume.*` for *every* mounted volume, but `secret` / `configMap` / `downwardAPI`
-  / `emptyDir` volumes and the projected serviceaccount-token volume (`kube-api-access-*`) have
-  static capacity that never moves — those datapoints are pure DPM waste. The reference config's
+  volumes and the projected serviceaccount-token volume (`kube-api-access-*`) are read-only with
+  capacity that never moves — those datapoints are pure DPM waste. (`emptyDir` is deliberately
+  **not** dropped: it is writable ephemeral storage and its usage is a real disk-pressure signal.)
+  The reference config's
   `filter/drop_static_volume_mounts` discards them by `k8s.volume.type` (which requires
   `extra_metadata_labels: [k8s.volume.type]` on the volume receiver). Dropping is strictly
   cheaper than slow-scraping. The kube-state-metrics side of the same data — `kube_secret_*`,
