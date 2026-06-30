@@ -11,7 +11,11 @@ Thank you for your interest in contributing!
 
 ## Adding a Skill
 
-Skills live under `skills/<skill-name>/` and must include a `SKILL.md` with YAML frontmatter (`name` and `description`). Optional subdirectories: `scripts/`, `references/`, `assets/`.
+Prefer using the [`skill-creator`](https://github.com/anthropics/skills/tree/main/skill-creator) skill to scaffold and refine new skills rather than authoring them by hand — it walks you through the structure and helps keep skills well-scoped.
+
+Skills live under `skills/<skill-name>/` and must follow the [Agent Skills specification](https://agentskills.io/specification). Each must include a `SKILL.md` with YAML frontmatter (`name` and `description`), where the directory name matches the `name` field. Optional subdirectories: `scripts/`, `references/`, `assets/`.
+
+Validate your skill locally before opening a pull request to confirm it conforms to the spec and activates as intended.
 
 After adding a skill, update the table in `README.md`.
 
