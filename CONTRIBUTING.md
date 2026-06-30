@@ -17,7 +17,7 @@ Skills live under `skills/<skill-name>/` and must follow the [Agent Skills speci
 
 Validate your skill locally before opening a pull request to confirm it conforms to the spec and activates as intended.
 
-After adding a skill, update the table in `README.md`.
+When you add or rename a skill, keep all three registration points in sync: the `skills/<skill-name>/SKILL.md` directory, the `plugins` entry in `.claude-plugin/marketplace.json`, and the table and layout tree in `README.md`.
 
 ## Commit Messages
 

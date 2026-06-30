@@ -11,7 +11,9 @@ A catalog of **Agent Skills** (per the [agentskills.io](https://agentskills.io/s
 Each skill is a self-contained directory under `skills/<skill-name>/`:
 
 - `SKILL.md` (required) — YAML frontmatter (`name`, `description`, optional `license`, `compatibility`, `metadata`) followed by the instruction body.
+- `scripts/` (optional) — helper or validation scripts.
 - `references/` (optional) — supporting docs the SKILL.md links to for detail it doesn't inline.
+- `assets/` (optional) — static files used by the skill.
 
 Two hard rules that are easy to get wrong:
 
