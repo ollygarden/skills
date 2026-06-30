@@ -43,6 +43,10 @@
     {
       "name": "ollygarden-otel-js-setup",
       "source": "./skills/ollygarden-otel-js-setup"
+    },
+    {
+      "name": "ollygarden-otel-collector-k8s-daemonset",
+      "source": "./skills/ollygarden-otel-collector-k8s-daemonset"
     }
   ]
 }
