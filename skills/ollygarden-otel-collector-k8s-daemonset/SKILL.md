@@ -46,7 +46,11 @@ These four are not tuning knobs — they are the baseline. Omitting any of them 
    or one annotation inflates every span/metric/log on the pod.
 3. **Enrich, don't fabricate.** `resourcedetection` + `k8sattributes` add real identity
    (cloud, node, namespace, workload). Disable `host.name` in the `system` detector so a pod
-   name never masquerades as the node hostname.
+   name never masquerades as the node hostname. **Scope the `k8sattributes` informer to the
+   local node** (`filter.node_from_env_var: K8S_NODE_NAME`) — without it every DaemonSet replica
+   watches every pod in the cluster, which is a large and avoidable memory cost at fleet scale.
+   (`resourcedetection` detector *ordering* interacts with `override` and the precedence has
+   differed across versions — pin your distro and confirm which detector wins before relying on it.)
 4. **Restart-safe state.** Persist filelog read offsets via the `file_storage` extension, so
    a collector restart does not re-read every pod log from the top and duplicate it.
 
@@ -59,24 +63,40 @@ Metrics volume is driven by **series count × datapoints-per-minute**. Attack bo
   (usage + utilization) and turns the rest off. For `hostmetrics`, prefer the bounded
   `*.utilization` gauges over the per-state monotonic `*.time`/`*.usage` counters, which
   multiply series.
-- **Scrape no faster than the signal changes.** `kubeletstats: 20s`, `hostmetrics: 60s`.
-  Finer intervals multiply DPM for metrics that barely move.
+- **Scrape no faster than the signal changes, and split fast from slow.** The reference
+  config now ships the **dual-receiver split** baked in: `kubeletstats/main` (container/pod/node)
+  at 20s alongside `kubeletstats/volume` at 60s, and `hostmetrics/fast` (cpu/memory) at 60s
+  alongside `hostmetrics/slow` (filesystem) at 300s. Finer intervals multiply DPM for metrics
+  that barely move.
+- **Drop static-volume metrics (secrets, configmaps, serviceaccount tokens).** kubeletstats
+  emits `k8s.volume.*` for *every* mounted volume, but `secret` / `configMap` / `downwardAPI`
+  volumes and the projected serviceaccount-token volume (`kube-api-access-*`) are read-only with
+  capacity that never moves — those datapoints are pure DPM waste. (`emptyDir` is deliberately
+  **not** dropped: it is writable ephemeral storage and its usage is a real disk-pressure signal.)
+  The reference config's
+  `filter/drop_static_volume_mounts` discards them by `k8s.volume.type` (which requires
+  `extra_metadata_labels: [k8s.volume.type]` on the volume receiver). Dropping is strictly
+  cheaper than slow-scraping. The kube-state-metrics side of the same data — `kube_secret_*`,
+  `kube_configmap_*`, `kube_serviceaccount_*` and the `*_info`/`*_labels` metadata gauges — is
+  near-static too; the `kube-state-metrics-metadata` scrape job keeps only those families at 5m.
 - **Cut datapoints-per-minute on the metrics you keep but that change slowly**
   (capacity/limits/requests, `*_info`/`*_labels` metadata gauges, replica counts). This is
   OllyGarden's **metric DPM reduction** remediation — see `remediation-metric-dpm-reduction`
   for the full catalog and decision tree. Two patterns, in preference order:
-  - **Pattern A — dual-receiver split (preferred, no extra processors).** Run the same
-    receiver twice over disjoint metric subsets at different `collection_interval`: e.g.
+  - **Pattern A — dual-receiver split (preferred, no extra processors; shipped above).** Run the
+    same receiver twice over disjoint metric subsets at different `collection_interval`:
     `kubeletstats` volume metrics at 60s while container/pod/node stay at 20s; `hostmetrics`
     `filesystem` at 300s while cpu/memory stay at 60s; two Prometheus scrape jobs splitting
-    fast status metrics (30s) from slow `kube_.*_info|_labels|_limits|_requests` (300s). Do
-    NOT just raise the interval on a single receiver — that also downsamples the
-    high-information CPU/memory series.
-  - **Pattern B — `routing` connector + `interval` processor (fallback).** Use when the
-    cadence is SDK-set and arrives over OTLP, or the receiver has no partition knob. Route
+    fast status metrics (30s) from slow `kube_.*_info|_labels|_limits|_requests` (300s) — the
+    `kube-state-metrics-metadata` job is the slow half of this (the fast KSM job is left for you
+    to add if you want those status metrics). Do NOT just raise the interval on a single
+    receiver — that also downsamples the high-information CPU/memory series.
+  - **Pattern B — `routing` connector + `interval` processor (fallback, not shipped).** Use when
+    the cadence is SDK-set and arrives over OTLP, or the receiver has no partition knob. Route
     the slow families to a pipeline whose `interval` processor re-emits them on a fixed tick;
     keep a `default_pipelines` passthrough (unmatched metrics are dropped silently otherwise).
-    `interval` must be longer than the source `collection_interval`, and never stack two.
+    `interval` must be longer than the source `collection_interval`, never stack two, and note
+    it emits empty pdata between ticks — any "emission rate" alert must filter empties first.
 - **Shard Prometheus scraping by node.** Each DaemonSet replica scrapes only pods on its own
   node (`field: spec.nodeName=${K8S_NODE_NAME}`), so N replicas cover a disjoint set instead
   of every replica scraping every pod. Add a slow tier (`5m`) for expensive endpoints and
@@ -92,16 +112,25 @@ Metrics volume is driven by **series count × datapoints-per-minute**. Attack bo
 - **Cap line size** (`max_log_size: 100KiB`). A few runaway lines (serialized payloads,
   stack dumps) otherwise dominate log ingest.
 - **Drop low-value severities** you never query (e.g. sub-INFO in production) with a `filter`.
+  When severity rides inside a structured body rather than on the record, derive
+  `severity_number` first (e.g. `ParseJSON(body)` then map `level`), or the severity filter has
+  nothing to match.
+- **Dedup repeated log lines at the source — but mind the offset attributes.** `logdedup`
+  collapses identical lines over a window, but the `filelog` receiver stamps every record with
+  `log.file.path` and (if enabled) `log.file.record_number`, and `logdedup` hashes the
+  attributes — so unless you strip those two keys first, dedup matches nothing and is a silent
+  no-op. Scope dedup to known-chatty services and strip the offset attributes on the same
+  condition immediately before it. See the `otel-collector` skill's `logdedup` page.
 - **Access logs are cheaper as metrics.** High-volume HTTP access logs whose value is the
   *aggregate* (request/error rate, latency by route) should be converted to metrics and the
-  raw records dropped — OllyGarden's **access-log-to-metrics** remediation. Two opinions that
+  raw records dropped — OllyGarden's **access-log-to-metrics** remediation. Three opinions that
   are easy to get wrong: emit the semconv `http.server.request.duration` **exponential
-  histogram** via a `signaltometrics` connector (its count is the request volume, a filtered
+  histogram** via a `signal_to_metrics` connector (its count is the request volume, a filtered
   count is the error rate) — do NOT invent an `http.server.request.count` sum, semconv has no
-  request counter — and put the `batch` processor **before** the connector, since it
-  aggregates per incoming batch. This pipeline is owned end-to-end (with a validated
-  reproducer) by `remediation-access-log-to-metrics`; use that skill rather than rebuilding it
-  here.
+  request counter; put the `batch` processor **before** the connector, since it aggregates per
+  incoming batch; and note `signal_to_metrics` is a **contrib-only** connector, so confirm your
+  distro ships it. This pipeline is owned end-to-end (with a validated reproducer) by
+  `remediation-access-log-to-metrics`; use that skill rather than rebuilding it here.
 - **Some log fixes are source-side, not collector-side.** Unstructured logs that bake data
   into the message string are fixed in app code (structured logging with semconv field
   names), not by a brittle collector regex — see `remediation-structured-logging-migration`.
@@ -109,11 +138,15 @@ Metrics volume is driven by **series count × datapoints-per-minute**. Attack bo
 
 ## Traces: drop noise here, sample at the gateway
 
-- **Drop probe spans** (health/readiness/liveness). Match on **both** `http.route` and span
-  `name` — many frameworks name the span after the handler (Spring → `HealthController.health`)
-  so there is no `/health` string to match. Probe spans have been measured at ~28% of all
-  spans in real fleets. There is no agent-side knob for this in the Java instrumentation, so
-  the collector is the right place — see `remediation-java-agent-hygiene`.
+- **Drop probe spans** (health/readiness/liveness). The probe path lands on `http.route`
+  (stable semconv), `url.path` (current), or the deprecated `http.target` depending on the
+  instrumentation, so the reference filter checks all three; and many frameworks name the span
+  after the handler (Spring → `HealthController.health`, or bare method names like `getStatus` /
+  `isReady`) so there is no `/health` string to match — match the span `name` too. Anchor the
+  name match (`\b…\b`); do **not** copy unanchored field globs like `"*/health.*"` — that is not
+  a valid RE2 anchor and silently matches the wrong spans. Probe spans have been measured at
+  ~28% of all spans in real fleets. There is no agent-side knob for this in the Java
+  instrumentation, so the collector is the right place — see `remediation-java-agent-hygiene`.
 - **Drop static-asset spans** (`.css`, `.js`, images, fonts, `.map`). These are high-volume
   and never the subject of a latency investigation. The **preferred** fix is at the source —
   suppress the span in nginx / ingress-nginx (`remediation-nginx-static-asset-tracing`); the
@@ -151,12 +184,17 @@ otelcol-contrib validate --config references/daemonset-collector.yaml
 ```
 
 `validate` checks structure, component existence, and OTTL syntax, and also instantiates the
-pipeline. Two consequences when you run it **off-cluster**: cloud/k8s components
-(`resourcedetection` cloud detectors, `k8sattributes`) fail to initialize because there is no
-Kubernetes API or metadata service, and `hostmetrics` `root_path: /hostfs` needs the host
-mount. Those errors are environment artifacts — they disappear when the DaemonSet runs in the
-cluster with the host root and service account mounted. A genuine config error (a bad OTTL
-statement, an unknown component, a misspelled key) surfaces before that pipeline-build phase.
+pipeline. Several errors are pure **off-cluster** artifacts: cloud detectors in
+`resourcedetection` (e.g. `eks`) and `kubeletstats` `auth_type: serviceAccount` (it reads the
+SA CA cert at build time) fail because there is no Kubernetes API or service-account mount, and
+`hostmetrics` `root_path: /hostfs` needs the host mount. They disappear when the DaemonSet runs
+in the cluster. A genuine config error (a bad OTTL statement, an unknown component, a misspelled
+key) surfaces during the same phase, so they can mask one: the build aborts at the *first*
+failure. To force the **whole** pipeline to build off-cluster — and thus compile every OTTL
+filter/transform downstream of `resourcedetection` — validate a throwaway overlay with the cloud
+detectors swapped for `[env]` and `kubeletstats` `auth_type: none`; a clean run then means all
+components instantiated and all OTTL compiled. (Validated this way on `otelcol-contrib`
+v0.154.0.)
 
 `validate` does not check that env vars resolve or that OTTL matches your data. After it
 passes, confirm the filters actually drop what you intend with a `debug` exporter and a sample
