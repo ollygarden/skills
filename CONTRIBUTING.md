@@ -11,9 +11,13 @@ Thank you for your interest in contributing!
 
 ## Adding a Skill
 
-Skills live under `skills/<skill-name>/` and must include a `SKILL.md` with YAML frontmatter (`name` and `description`). Optional subdirectories: `scripts/`, `references/`, `assets/`.
+Prefer using the [`skill-creator`](https://github.com/anthropics/skills/tree/main/skill-creator) skill to scaffold and refine new skills rather than authoring them by hand — it walks you through the structure and helps keep skills well-scoped.
 
-After adding a skill, update the table in `README.md`.
+Skills live under `skills/<skill-name>/` and must follow the [Agent Skills specification](https://agentskills.io/specification). Each must include a `SKILL.md` with YAML frontmatter (`name` and `description`), where the directory name matches the `name` field. Optional subdirectories: `scripts/`, `references/`, `assets/`.
+
+Validate your skill locally before opening a pull request to confirm it conforms to the spec and activates as intended.
+
+When you add or rename a skill, keep all three registration points in sync: the `skills/<skill-name>/SKILL.md` directory, the `plugins` entry in `.claude-plugin/marketplace.json`, and the table and layout tree in `README.md`.
 
 ## Commit Messages
 
