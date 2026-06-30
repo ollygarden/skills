@@ -43,7 +43,8 @@ skills/
 ├── ollygarden-otel-go-setup/
 ├── ollygarden-otel-java-setup/
 ├── ollygarden-otel-js-setup/
-└── ollygarden-otel-collector-k8s-daemonset/
+├── ollygarden-otel-collector-k8s-daemonset/
+└── ollygarden-otel-collector-config-validation/
 ```
 
 All skill `name:` fields carry an `ollygarden-` prefix to declare ownership in the global skill namespace. The `ollygarden-otel-*` skills are OllyGarden's opinions layered on top of upstream OpenTelemetry facts published in the companion package [`opentelemetry-agent-skills`](https://github.com/ollygarden/opentelemetry-agent-skills); install both packages so the OTel opinion skills can reference the upstream `otel-semantic-conventions`, `otel-sdk-versions`, etc.
@@ -62,6 +63,7 @@ All skill `name:` fields carry an `ollygarden-` prefix to declare ownership in t
 | [`ollygarden-otel-java-setup`](skills/ollygarden-otel-java-setup/) | OllyGarden's recommended Java OTel setup: Javaagent vs Spring Boot Starter vs autoconfigure decision tree, BOM dependency pattern. |
 | [`ollygarden-otel-js-setup`](skills/ollygarden-otel-js-setup/) | OllyGarden's recommended Node.js OTel setup: project structure, instrumentation choices, entry-point ordering. |
 | [`ollygarden-otel-collector-k8s-daemonset`](skills/ollygarden-otel-collector-k8s-daemonset/) | OllyGarden's opinionated, optimization-first OTel Collector config for a Kubernetes node agent (DaemonSet): drop early at the node, curated receivers, noise/cardinality/cost reduction across logs, metrics, traces. |
+| [`ollygarden-otel-collector-config-validation`](skills/ollygarden-otel-collector-config-validation/) | OllyGarden's end-to-end method for validating a collector config: `otelcol validate`, then a real collector in Docker/Podman fed by telemetrygen with a file exporter, asserting that a processor or connector actually transforms, drops, or routes telemetry as intended. |
 
 ## License
 

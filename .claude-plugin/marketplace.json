@@ -47,6 +47,10 @@
     {
       "name": "ollygarden-otel-collector-k8s-daemonset",
       "source": "./skills/ollygarden-otel-collector-k8s-daemonset"
+    },
+    {
+      "name": "ollygarden-otel-collector-config-validation",
+      "source": "./skills/ollygarden-otel-collector-config-validation"
     }
   ]
 }
