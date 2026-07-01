@@ -4,7 +4,7 @@
 # from prometheus/*.yaml via the file provider. Shared otlp receiver / processors
 # live in common.yaml.
 # Merge: --config file:common.yaml --config file:metrics.yaml
-# IMPORTANT: ${file:} paths resolve relative to the collector's WORKING DIRECTORY,
+# IMPORTANT: file: include paths resolve relative to the collector's WORKING DIRECTORY,
 # so run validate / the collector from inside this references/ directory.
 # Component config -> `otel-collector` skill. OTTL syntax -> `otel-ottl` skill.
 
@@ -96,7 +96,7 @@ receivers:
 
   # --- Prometheus scraping of pods on THIS node ---------------------------
   # The three scrape jobs are maintained as separate fragment files and pulled
-  # in here. ${file:} paths are relative to the collector's working directory.
+  # in here. file: include paths are relative to the collector's working directory.
   prometheus:
     config:
       scrape_configs:
