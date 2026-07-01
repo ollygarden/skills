@@ -14,9 +14,14 @@ node is already lean. It layers opinions on top of upstream facts:
 - For OTTL statement/condition syntax → the **`otel-ottl`** skill.
 - For source-side fixes that the collector cannot do → the `ollygarden-otel-*` setup skills.
 
-The companion reference config is [`references/daemonset-collector.yaml`](references/daemonset-collector.yaml).
-Read it alongside this file; the prose explains *why*, the YAML shows *how*. Copy it, then
-search for `CUSTOMIZE`.
+The companion reference config is **decomposed by signal pipeline** under
+[`references/`](references/): a shared [`common.yaml`](references/common.yaml) plus
+[`traces.yaml`](references/traces.yaml), [`metrics.yaml`](references/metrics.yaml), and
+[`logs.yaml`](references/logs.yaml), with the Prometheus scrape jobs pulled in from
+[`references/prometheus/`](references/prometheus/). Read them alongside this file; the prose
+explains *why*, the YAML shows *how*. Copy the set, then search for `CUSTOMIZE`. See
+[Decomposing this config](#decomposing-this-config) for how the files merge and how to validate
+them together.
 
 ## When this skill applies
 
@@ -175,12 +180,93 @@ These belong in the gateway/cluster collector, not the node agent:
   once per node — otherwise every node double-counts them. Their tuning (e.g. dropping
   zero-value replicaset datapoints, disabling `k8s.namespace.phase`) lives in that Deployment.
 
+## Decomposing this config
+
+This reference config is split into multiple files instead of one monolith, because a
+single ~470-line collector YAML is painful to review, test, and vary per environment. The
+collector **deep-merges** repeated `--config file:` sources — later keys override earlier
+ones at each level — and the file/env/yaml providers do inclusion and variable substitution.
+That merge is what lets you split by concern and have the collector reassemble the whole.
+
+**The layout we ship — by signal pipeline.** [`common.yaml`](references/common.yaml) holds
+everything shared by all three pipelines (the `otlp` receiver, `memory_limiter`,
+`resourcedetection`, `k8sattributes`, `resource/clustername`, `transform/truncate_resources`,
+`batch`, the `otlp` exporter, the `file_storage` extension, and `service.telemetry`), defined
+once. Each of [`traces.yaml`](references/traces.yaml),
+[`metrics.yaml`](references/metrics.yaml), and [`logs.yaml`](references/logs.yaml) is
+self-contained for its signal: its own signal-specific receivers and processors plus its own
+`service.pipelines.<signal>` entry. The three pipeline keys are distinct, so the merge combines
+them without collision. This pattern fits because this skill's guidance is already organized
+signal by signal, and because it keeps each pipeline's processor *array* in one file (see the
+array caveat below).
+
+**Nested inclusion for big sub-blocks.** The Prometheus receiver's three scrape jobs are the
+one block large and independent enough to externalize, so each lives as a bare-fragment file
+under [`references/prometheus/`](references/prometheus/) and is pulled in with the file
+provider:
+
+```yaml
+receivers:
+  prometheus:
+    config:
+      scrape_configs:
+        - ${file:prometheus/scrape-pods.yaml}
+        - ${file:prometheus/scrape-pods-slow.yaml}
+        - ${file:prometheus/scrape-kube-state-metrics.yaml}
+```
+
+Each included file is a raw YAML fragment (a single scrape-job map, no top-level keys) that the
+provider inlines at the reference point. The same shape works for future tail-sampling policies
+at the gateway tier. Don't over-apply it: indirection has a cost, so externalize only blocks
+that are both large and independently ownable.
+
+**Two other patterns, if your org boundaries differ** (described here, not shipped):
+
+- *Split by component type* — `base.yaml` (service + extensions) plus `receivers.yaml`,
+  `processors.yaml`, `exporters.yaml`. Fits when separate teams own receivers vs. processors
+  vs. exporter destinations. The `service.pipelines` arrays still live in one file.
+- *Environment overlays* — a base plus `production.yaml` / `staging.yaml` / `development.yaml`
+  that override limits, endpoints, and exporters. Layer this on top of either split. Selected
+  at deploy time with an extra `--config file:` flag.
+
+**Merge caveats — these bite silently:**
+
+1. **Arrays are replaced, not merged.** If a base defines `processors: [a, b, c]` and an
+   overlay defines `processors: [a, b]`, the result is `[a, b]`, not the union. Keep things
+   that vary together — especially a pipeline's processor list — in one file.
+2. **`${file:}` paths resolve relative to the collector's working directory**, not the file
+   containing the include. Run the collector (and `validate`) from the directory that makes the
+   `prometheus/...` paths resolve — i.e. from inside `references/` — or use absolute paths.
+3. **`${env:VAR:-default}` defaults apply only when the variable is *unset*.** An exported
+   `VAR=""` is not unset, so the default does not kick in. Validate required vars externally
+   before start (e.g. `: ${OTLP_EXPORTER_ENDPOINT:?must be set}`).
+4. **OCB-built distributions must list the providers.** The file, env, and yaml providers are
+   not included by default; add them to the builder manifest, or `${file:}` / `${env:}` URIs
+   fail with cryptic scheme errors.
+5. **Validate and `print-config` the *merged* set**, never a fragment alone — a single signal
+   file references shared processors it does not define and will not validate on its own.
+
 ## Verify before shipping
 
 Validate the config against the collector binary that will run it:
 
 ```sh
-otelcol-contrib validate --config references/daemonset-collector.yaml
+# Run from inside references/ so the ${file:} include paths resolve (caveat 2 above).
+cd references
+otelcol-contrib validate \
+  --config file:common.yaml \
+  --config file:traces.yaml \
+  --config file:metrics.yaml \
+  --config file:logs.yaml
+```
+
+Inspect the fully-merged, env-substituted result (useful for debugging merge or include
+issues) with `print-config` and the same `--config` flags:
+
+```sh
+otelcol-contrib print-config \
+  --config file:common.yaml --config file:traces.yaml \
+  --config file:metrics.yaml --config file:logs.yaml
 ```
 
 `validate` checks structure, component existence, and OTTL syntax, and also instantiates the
@@ -193,8 +279,7 @@ key) surfaces during the same phase, so they can mask one: the build aborts at t
 failure. To force the **whole** pipeline to build off-cluster — and thus compile every OTTL
 filter/transform downstream of `resourcedetection` — validate a throwaway overlay with the cloud
 detectors swapped for `[env]` and `kubeletstats` `auth_type: none`; a clean run then means all
-components instantiated and all OTTL compiled. (Validated this way on `otelcol-contrib`
-v0.154.0.)
+components instantiated and all OTTL compiled. (Validated this way on `otelcol-contrib` v0.155.0.)
 
 `validate` does not check that env vars resolve or that OTTL matches your data. After it
 passes, confirm the filters actually drop what you intend with a `debug` exporter and a sample
