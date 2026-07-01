@@ -1,0 +1,28 @@
+# Nested-included into metrics.yaml via the file provider (see metrics.yaml).
+# Bare scrape-job map.
+# Cluster-singleton metadata (kube-state-metrics): secret, configmap,
+# serviceaccount-token, and *_info/_labels/_limits/_requests gauges are
+# near-static — scrape them at 5m, not 30s. This is the worked
+# secrets/configmaps/tokens DPM-reduction example. NOTE: kube-state-metrics
+# is a single cluster-wide pod, so only the agent on its node scrapes it;
+# for a large fleet prefer scraping KSM once from the gateway/cluster
+# collector instead (see Out of scope in SKILL.md). The fast KSM status
+# metrics, if you want them, belong in a separate 30s job.
+job_name: kube-state-metrics-metadata
+scrape_interval: 5m
+scrape_timeout: 30s
+kubernetes_sd_configs:
+  - role: pod
+    selectors:
+      - role: pod
+        field: spec.nodeName=${env:K8S_NODE_NAME}
+relabel_configs:
+  - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+    regex: kube-state-metrics
+    action: keep
+metric_relabel_configs:
+  # Keep only the slow metadata families — this is where kube_secret_*,
+  # kube_configmap_*, and kube_serviceaccount_* live.
+  - source_labels: [__name__]
+    regex: kube_secret_.*|kube_configmap_.*|kube_serviceaccount_.*|kube_.*_info|kube_.*_labels|kube_.*_limits|kube_.*_requests|kube_.*_owner
+    action: keep

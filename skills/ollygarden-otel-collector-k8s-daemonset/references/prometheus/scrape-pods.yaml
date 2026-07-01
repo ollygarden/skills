@@ -1,0 +1,30 @@
+# Nested-included into metrics.yaml's prometheus.config.scrape_configs via the
+# file provider (see metrics.yaml). This file is a bare scrape-job map.
+# Each DaemonSet replica scrapes ONLY pods on its own node, so N replicas scrape
+# a disjoint set instead of all scraping all.
+job_name: kubernetes-pods
+scrape_interval: 30s
+kubernetes_sd_configs:
+  - role: pod
+    selectors:
+      - role: pod
+        field: spec.nodeName=${env:K8S_NODE_NAME}
+relabel_configs:
+  - source_labels: [__meta_kubernetes_pod_phase]
+    regex: Pending|Succeeded|Failed|Completed
+    action: drop # terminal pods produce no useful series
+  - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+    regex: "true"
+    action: keep
+  # Honor the standard prometheus.io/{scheme,path,port} annotations so
+  # pods on non-default endpoints are scraped correctly.
+  - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scheme]
+    regex: (https?)
+    target_label: __scheme__
+  - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+    regex: (.+)
+    target_label: __metrics_path__
+  - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+    regex: ([^:]+)(?::\d+)?;(\d+)
+    replacement: $1:$2
+    target_label: __address__

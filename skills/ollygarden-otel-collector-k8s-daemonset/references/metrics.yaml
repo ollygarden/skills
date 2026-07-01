@@ -1,0 +1,171 @@
+# Metrics pipeline for the decomposed node-agent collector.
+# Self-contained for metrics: metric receivers + metric-only processors +
+# service.pipelines.metrics. The Prometheus receiver's scrape jobs are pulled in
+# from prometheus/*.yaml via the file provider. Shared otlp receiver / processors
+# live in common.yaml.
+# Merge: --config file:common.yaml --config file:metrics.yaml
+# IMPORTANT: ${file:} paths resolve relative to the collector's WORKING DIRECTORY,
+# so run validate / the collector from inside this references/ directory.
+# Component config -> `otel-collector` skill. OTTL syntax -> `otel-ottl` skill.
+
+receivers:
+  # --- Node + pod resource metrics ----------------------------------------
+  # Split into two receiver instances over disjoint metric_groups at different
+  # collection_intervals: the slow-changing volume group scrapes at 1/3 the rate
+  # of the cpu/memory utilization metrics. Same receiver, no extra processors —
+  # OllyGarden's preferred "Pattern A" DPM reduction. Do NOT instead raise the
+  # interval on a single receiver: that also downsamples the high-information
+  # cpu/memory series. See remediation-metric-dpm-reduction.
+  kubeletstats/main:
+    collection_interval: 20s
+    auth_type: serviceAccount
+    endpoint: ${env:K8S_NODE_NAME}:10250
+    insecure_skip_verify: true
+    metric_groups: [container, pod, node] # volume is the slow instance's job
+    metrics:
+      # Curated allowlist: usage + utilization only. Everything not listed
+      # here that is off-by-default stays off.
+      container.cpu.usage: {enabled: true}
+      k8s.node.cpu.usage: {enabled: true}
+      k8s.pod.cpu.usage: {enabled: true}
+      k8s.pod.cpu_limit_utilization: {enabled: true}
+      k8s.pod.cpu_request_utilization: {enabled: true}
+      k8s.pod.memory_limit_utilization: {enabled: true}
+      k8s.pod.memory_request_utilization: {enabled: true}
+
+  kubeletstats/volume:
+    collection_interval: 60s # volume capacity/usage barely moves — 3× fewer DP
+    auth_type: serviceAccount
+    endpoint: ${env:K8S_NODE_NAME}:10250
+    insecure_skip_verify: true
+    metric_groups: [volume]
+    # k8s.volume.type is what lets filter/drop_static_volume_mounts (below)
+    # discard secret/configMap/downwardAPI/projected-SA-token volume stats.
+    extra_metadata_labels: [k8s.volume.type]
+    # Drop deprecated volume resource attributes — pure noise/cardinality.
+    resource_attributes:
+      aws.volume.id: {enabled: false}
+      fs.type: {enabled: false}
+      gce.pd.name: {enabled: false}
+      glusterfs.endpoints.name: {enabled: false}
+      glusterfs.path: {enabled: false}
+      partition: {enabled: false}
+
+  # --- Host metrics -------------------------------------------------------
+  # Pattern A again: filesystem capacity is near-static, so it goes to a 300s
+  # instance while cpu/memory utilization stay at 60s.
+  hostmetrics/fast:
+    collection_interval: 60s # 60s, not 10s — host metrics rarely need finer
+    root_path: /hostfs
+    scrapers:
+      cpu:
+        metrics:
+          # Keep the bounded-cardinality utilization gauge; drop the
+          # monotonic per-state time counter that explodes series count.
+          system.cpu.time: {enabled: false}
+          system.cpu.utilization: {enabled: true}
+      memory:
+        metrics:
+          system.memory.usage: {enabled: false}
+          system.memory.utilization: {enabled: true}
+
+  hostmetrics/slow:
+    collection_interval: 300s # filesystem capacity is near-static
+    root_path: /hostfs
+    scrapers:
+      filesystem:
+        metrics:
+          system.filesystem.usage: {enabled: false}
+          system.filesystem.utilization: {enabled: true}
+        exclude_fs_types:
+          match_type: strict
+          fs_types:
+            [autofs, binfmt_misc, bpf, cgroup2, configfs, debugfs, devpts,
+             devtmpfs, fusectl, hugetlbfs, mqueue, nsfs, overlay, proc, procfs,
+             pstore, rpc_pipefs, securityfs, selinuxfs, squashfs, sysfs, tracefs]
+        exclude_mount_points:
+          match_type: regexp
+          mount_points:
+            - /dev/.*
+            - /proc/.*
+            - /sys/.*
+            - /run/k3s/containerd/.*
+            - /var/lib/docker/.*
+            - /var/lib/kubelet/.*
+            - /snap/.*
+
+  # --- Prometheus scraping of pods on THIS node ---------------------------
+  # The three scrape jobs are maintained as separate fragment files and pulled
+  # in here. ${file:} paths are relative to the collector's working directory.
+  prometheus:
+    config:
+      scrape_configs:
+        - ${file:prometheus/scrape-pods.yaml}
+        - ${file:prometheus/scrape-pods-slow.yaml}
+        - ${file:prometheus/scrape-kube-state-metrics.yaml}
+
+processors:
+  # Drop telemetry from namespaces you do not monitor. Receivers above collect
+  # node-wide; this trims to the namespaces you care about.
+  # CUSTOMIZE the allowlist regex.
+  filter/only_monitored_namespaces:
+    error_mode: ignore
+    metrics:
+      datapoint:
+        # Keep cluster-level kube-state-metrics (kube_*) regardless of namespace:
+        # the Prometheus receiver stamps them with the KSM pod's OWN namespace,
+        # which is rarely in the workload allowlist, so without this guard the
+        # kube-state-metrics-metadata scrape would be silently dropped here.
+        - >-
+          resource.attributes["k8s.namespace.name"] != nil and
+          not IsMatch(metric.name, "^kube_") and
+          not IsMatch(resource.attributes["k8s.namespace.name"],
+            "^(my-app|payments|checkout)$")
+
+  # Drop per-volume stats for read-only, static mount types. secret / configMap
+  # / downwardAPI / projected serviceaccount-token volumes have capacity that
+  # never moves, so emitting k8s.volume.* for them is pure DPM waste — and
+  # dropping is cheaper than slow-scraping. NOT emptyDir: it is writable
+  # ephemeral storage whose usage is a real disk-pressure signal, so it is kept.
+  # Requires extra_metadata_labels: [k8s.volume.type] on the kubeletstats/volume
+  # receiver (set above). The last clause catches the projected SA-token volume,
+  # which has no k8s.volume.type but a well-known kube-api-access-* name.
+  filter/drop_static_volume_mounts:
+    error_mode: ignore
+    metrics:
+      datapoint:
+        - resource.attributes["k8s.volume.type"] == "configMap"
+        - resource.attributes["k8s.volume.type"] == "secret"
+        - resource.attributes["k8s.volume.type"] == "downwardAPI"
+        - >-
+          resource.attributes["k8s.volume.name"] != nil and
+          resource.attributes["k8s.volume.type"] == nil and
+          IsMatch(resource.attributes["k8s.volume.name"], "^kube-api-access-")
+
+  # Prometheus service-identity cleanup: the scrape pipeline synthesizes a
+  # service.name (= job name) and service.instance.id (= host:port). Left
+  # alone they become junk, high-cardinality service identity. Delete them so
+  # the backend resolves identity from real resource attributes instead.
+  transform/prometheus_service_attributes:
+    error_mode: ignore
+    metric_statements:
+      - context: resource
+        statements:
+          - delete_key(attributes, "service.name") where attributes["service.name"] != nil and IsMatch(attributes["service.name"], "^(kubernetes-pods|kube-state-metrics)")
+          - delete_key(attributes, "service.instance.id") where attributes["service.instance.id"] != nil and IsMatch(attributes["service.instance.id"], ":[0-9]+$")
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp, kubeletstats/main, kubeletstats/volume, hostmetrics/fast, hostmetrics/slow, prometheus]
+      processors:
+        - memory_limiter
+        - k8sattributes
+        - resourcedetection
+        - resource/clustername
+        - filter/only_monitored_namespaces
+        - filter/drop_static_volume_mounts
+        - transform/prometheus_service_attributes
+        - transform/truncate_resources
+        - batch
+      exporters: [otlp]
