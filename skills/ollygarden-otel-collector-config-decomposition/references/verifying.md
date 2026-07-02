@@ -33,16 +33,23 @@ otelcol-contrib print-config \
 ```
 
 Compare `merged.yaml` to the original. A structural (not textual) diff is what matters — key
-order and formatting will differ, semantics must not. In Python (pyyaml), assert:
+order and formatting will differ, semantics must not. Comparing **key sets** is not enough: a
+changed receiver endpoint or exporter TLS setting keeps the same keys but changes behavior. In
+Python (pyyaml), load both sides and assert:
 
-- equal top-level `receivers` / `processors` / `exporters` / `extensions` **key sets**;
-- equal per-pipeline `receivers` / `exporters`, and equal `processors` **arrays** (order
-  matters — processors run in sequence);
-- if you deliberately split one processor into two, apply a rename map and assert the split
-  pieces carry the original OTTL statements/conditions **verbatim**.
+- the two parsed configs are **recursively equal in full** — every `receivers` / `processors` /
+  `exporters` / `extensions` / `connectors` entry and the `service` block, values included, not
+  just the key sets. Normalize first so only real differences remain (e.g. round-trip both
+  through `yaml.safe_load`; treat maps as order-independent);
+- within that, a pipeline's `processors` is a **list**, so compare it order-sensitively —
+  processors run in sequence, and `[a, b]` ≠ `[b, a]`;
+- the *only* differences allowed are ones you introduced on purpose: if you split one processor
+  into two, apply a rename map before comparing, and assert the split pieces carry the original
+  OTTL statements/conditions **verbatim**.
 
 Any unexplained difference means the merge didn't reassemble what you started with — most often
-the array-replace caveat silently dropping a processor from a pipeline's list.
+the array-replace caveat silently dropping a processor from a pipeline's list, or an overlay
+value quietly winning over the base.
 
 Confirm nested includes actually inlined: `grep -c` the resolved output for a token that only
 appears inside an included fragment (e.g. `job_name` for Prometheus scrape jobs) and check the
