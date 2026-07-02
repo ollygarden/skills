@@ -51,6 +51,10 @@
     {
       "name": "ollygarden-otel-collector-config-validation",
       "source": "./skills/ollygarden-otel-collector-config-validation"
+    },
+    {
+      "name": "ollygarden-otel-collector-config-decomposition",
+      "source": "./skills/ollygarden-otel-collector-config-decomposition"
     }
   ]
 }
