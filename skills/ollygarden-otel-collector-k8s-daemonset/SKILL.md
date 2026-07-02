@@ -182,21 +182,20 @@ These belong in the gateway/cluster collector, not the node agent:
 
 ## Decomposing this config
 
-The reference config is split into multiple files, not one monolith: the collector
-**deep-merges** repeated `--config file:` sources, so you can split by concern and have it
-reassemble the whole. The layout we ship is **by signal pipeline** —
-[`common.yaml`](references/common.yaml) for everything shared by all three pipelines, plus a
-self-contained [`traces.yaml`](references/traces.yaml),
+The reference config is split into multiple files, not one monolith. The layout we ship is
+**by signal pipeline** — [`common.yaml`](references/common.yaml) for everything shared by all
+three pipelines, plus a self-contained [`traces.yaml`](references/traces.yaml),
 [`metrics.yaml`](references/metrics.yaml), and [`logs.yaml`](references/logs.yaml) (each with
 its own `service.pipelines.<signal>` entry). The Prometheus scrape jobs are pulled in as
 bare-fragment files under [`references/prometheus/`](references/prometheus/) via `${file:}`.
 
-Read [`references/decomposing-config.md`](references/decomposing-config.md) before editing the
-file set. It covers the merge mechanism, the two alternative patterns (split by component type;
-environment overlays), and the five merge caveats that bite silently — most importantly that
-**arrays are replaced, not merged** (keep a pipeline's processor list in one file) and that
-**`${file:}` paths resolve relative to the collector's working directory** (run from inside
-`references/`).
+The generic **mechanics** of collector-config decomposition — how the deep merge reassembles
+the files, the alternative split strategies, and the caveats that bite silently (arrays are
+replaced not merged; `${file:}` paths resolve relative to the working directory, so run from
+inside `references/`) — live in the **`ollygarden-otel-collector-config-decomposition`** skill.
+Read it before editing this file set;
+[`references/decomposing-config.md`](references/decomposing-config.md) only records how *this*
+config maps onto that pattern.
 
 ## Verify before shipping
 
@@ -221,6 +220,8 @@ your data.
 
 - Component facts: **`otel-collector`** (receivers/processors/exporters/connectors, renames).
 - OTTL: **`otel-ottl`** (the conditions and statements in the filter/transform blocks).
+- Config decomposition mechanics (the deep merge, split strategies, and merge caveats behind
+  this file set): **`ollygarden-otel-collector-config-decomposition`**.
 - Optimization remediations this config draws on or defers to:
   - `remediation-metric-dpm-reduction` — dual-receiver split / `interval` patterns and the
     per-metric target-interval catalog.
