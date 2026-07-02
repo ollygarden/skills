@@ -1,0 +1,58 @@
+# Traces pipeline for the decomposed node-agent collector.
+# Self-contained for traces: trace-only processors plus service.pipelines.traces.
+# The otlp receiver and the shared processors (memory_limiter, k8sattributes,
+# resourcedetection, resource/clustername, transform/truncate_resources, batch)
+# are defined in common.yaml. Merge: --config file:common.yaml --config file:traces.yaml
+# Component config -> `otel-collector` skill. OTTL syntax -> `otel-ottl` skill.
+
+processors:
+  # Drop health/readiness/liveness probe spans. Split out of the monolith's
+  # combined filter/drop_noise so the traces file owns its own processors.
+  # CUSTOMIZE to your actual probe routes / framework span names. Health probes
+  # alone have been measured at ~28% of all spans in some fleets.
+  filter/drop_probe_spans:
+    error_mode: ignore
+    traces:
+      span:
+        # Probe path can land on http.route (stable), url.path (current semconv),
+        # or the deprecated http.target depending on the instrumentation — cover
+        # all three. error_mode: ignore skips the clause when the attribute is nil.
+        - 'IsMatch(attributes["http.route"], "^/(health|healthz|readyz|livez|actuator/health)$")'
+        - 'IsMatch(attributes["url.path"], "^/(health|healthz|readyz|livez|actuator/health)$")'
+        - 'IsMatch(attributes["http.target"], "^/(health|healthz|readyz|livez|actuator/health)(\\?.*)?$")'
+        # Word-anchored so it catches "HealthController.health" but not, say,
+        # "PatientHealthRecordController.get". OTTL string literals process Go
+        # escapes, so the backslash is doubled here: "\\b" -> RE2 \b (boundary).
+        - 'IsMatch(name, "(?i)\\b(health|healthz|readiness|liveness)\\b")'
+        # Some frameworks name the probe span after the handler method with no
+        # "health" token at all (e.g. getStatus / isReady) — match those exactly.
+        - 'name == "getStatus" or name == "isReady"'
+
+  # Drop spans for static-asset requests (images/css/js/fonts). These are
+  # high-volume, low-value, and never the subject of a latency investigation.
+  # NOTE: the preferred fix is at the source — suppress the span in nginx /
+  # ingress-nginx (see remediation-nginx-static-asset-tracing). This collector
+  # filter is the portable fallback when you do not control the proxy. Regex is
+  # the canonical asset pattern; the (?:\?.*)?$ tail matches a query string.
+  filter/drop_static_assets:
+    error_mode: ignore
+    traces:
+      span:
+        # OTTL string literals process Go escapes, so each regex backslash is
+        # doubled: "\\." -> RE2 \. (literal dot), "\\?" -> RE2 \? (literal ?).
+        - 'attributes["url.path"] != nil and IsMatch(attributes["url.path"], "\\.(?:ico|css|js|mjs|map|png|jpe?g|gif|svg|webp|avif|woff2?|ttf|eot)(?:\\?.*)?$")'
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors:
+        - memory_limiter
+        - k8sattributes
+        - resourcedetection
+        - resource/clustername
+        - filter/drop_probe_spans
+        - filter/drop_static_assets
+        - transform/truncate_resources
+        - batch
+      exporters: [otlp]

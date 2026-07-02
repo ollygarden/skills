@@ -1,0 +1,55 @@
+# Logs pipeline for the decomposed node-agent collector.
+# Self-contained for logs: filelog receiver + log-only processors + service.pipelines.logs.
+# Shared otlp receiver / processors live in common.yaml.
+# Merge: --config file:common.yaml --config file:logs.yaml
+# Component config -> `otel-collector` skill. OTTL syntax -> `otel-ottl` skill.
+#
+# High-volume HTTP access logs are cheaper as metrics: convert them with a
+# signaltometrics connector (http.server.request.duration histogram) and drop the
+# raw records, rather than shipping every request line. That pipeline is owned
+# end-to-end by the remediation-access-log-to-metrics skill — use it instead of
+# reimplementing it here.
+
+receivers:
+  # --- Pod log collection -------------------------------------------------
+  filelog:
+    include: [/var/log/pods/*/*/*.log]
+    exclude:
+      # Never ingest the collector's own logs — that is a feedback loop.
+      - /var/log/pods/*otel-collector*/*/*.log
+    storage: file_storage/filelog_offsets
+    start_at: end
+    # Cap a single log line; runaway lines (stack dumps, serialized blobs)
+    # otherwise dominate ingest. Pairs with the source-side structured-logging fix.
+    max_log_size: 100KiB
+    include_file_name: false # redundant with k8s.* attributes; drop it
+    include_file_path: true
+    operators:
+      - id: container-parser
+        type: container # parse CRI/containerd/docker, set k8s.* metadata
+
+processors:
+  # Drop low-value severities you never query (e.g. sub-INFO in production).
+  # Split out of the monolith's combined filter/drop_noise so the logs file owns
+  # its own processors. When severity rides inside a structured body rather than
+  # on the record, derive severity_number first (e.g. ParseJSON(body) then map
+  # level), or this filter has nothing to match.
+  filter/drop_low_severity:
+    error_mode: ignore
+    logs:
+      log_record:
+        - 'severity_number < SEVERITY_NUMBER_INFO'
+
+service:
+  pipelines:
+    logs:
+      receivers: [otlp, filelog]
+      processors:
+        - memory_limiter
+        - k8sattributes
+        - resourcedetection
+        - resource/clustername
+        - filter/drop_low_severity
+        - transform/truncate_resources
+        - batch
+      exporters: [otlp]

@@ -1,0 +1,141 @@
+# Shared infrastructure for the decomposed Kubernetes node-agent (DaemonSet) collector.
+# Merge with traces.yaml, metrics.yaml, and logs.yaml via repeated --config file: flags.
+# This is a TEMPLATE — search for "CUSTOMIZE" before deploying.
+# Component config questions -> `otel-collector` skill. OTTL syntax -> `otel-ottl` skill.
+#
+# What lives here: everything shared by all three signal pipelines, defined once.
+# Signal-specific receivers/processors live in traces.yaml / metrics.yaml / logs.yaml.
+
+extensions:
+  # Durable filelog offsets survive restarts, so pod logs are not re-read from
+  # the start after a collector restart (avoids duplicate log records).
+  # CUSTOMIZE: back this directory with a hostPath/PVC in the DaemonSet. If it
+  # lives only on the container filesystem, a pod recreate loses the offsets and
+  # `start_at: end` then skips any logs written while the collector was down.
+  file_storage/filelog_offsets:
+    directory: /var/lib/otelcol/file_storage
+    create_directory: true
+
+receivers:
+  # --- OTLP ingest: applications on this node push here --------------------
+  # Shared by all three pipelines, so it is defined here once.
+  otlp:
+    protocols:
+      grpc:
+        # Bind 0.0.0.0, not the localhost default — otherwise containerized
+        # workloads on the node cannot reach the receiver.
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # ALWAYS first in every pipeline. Applies backpressure before buffers are
+  # allocated, so a traffic spike sheds load instead of OOM-killing the pod.
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+
+  # Cloud + k8s resource detection. host.name disabled in the system detector
+  # so a pod name does not masquerade as the node hostname.
+  resourcedetection:
+    detectors: [eks, ecs, ec2, gcp, aks, azure, k8snode, system]
+    timeout: 2s
+    override: false
+    system:
+      resource_attributes:
+        host.name: {enabled: false}
+
+  # K8s metadata enrichment. Pod labels/annotations are intentionally NOT
+  # extracted wholesale — each becomes a resource attribute and they are the
+  # usual source of resource-attribute bloat. Add specific ones deliberately.
+  k8sattributes:
+    auth_type: serviceAccount
+    passthrough: false
+    # Scope the informer to THIS node's pods. On a DaemonSet this is the
+    # difference between every replica watching every pod in the cluster and
+    # each replica watching only its own node — a large memory saving at scale.
+    # The value is the NAME of the env var holding the node name, not its value.
+    filter:
+      node_from_env_var: K8S_NODE_NAME
+    extract:
+      metadata:
+        - k8s.namespace.name
+        - k8s.pod.name
+        - k8s.pod.uid
+        - k8s.deployment.name
+        - k8s.node.name
+        - k8s.replicaset.name
+        - k8s.daemonset.name
+        - k8s.statefulset.name
+        - k8s.cronjob.name
+        - k8s.job.name
+        - container.image.name
+        - container.image.tag
+    pod_association:
+      - sources: [{from: resource_attribute, name: k8s.pod.uid}]
+      - sources: [{from: connection}]
+
+  # Stamp cluster identity so the backend can group/scope by cluster.
+  resource/clustername:
+    attributes:
+      - key: k8s.cluster.name
+        value: ${env:K8S_CLUSTER_NAME} # CUSTOMIZE via downward API / env
+        action: upsert
+
+  # LAST transform on every pipeline. Bound resource attribute values that can
+  # balloon (k8s pod annotations can be hundreds of KB).
+  transform/truncate_resources:
+    error_mode: ignore
+    trace_statements:
+      - context: resource
+        statements:
+          - truncate_all(attributes, 2048)
+    metric_statements:
+      - context: resource
+        statements:
+          - truncate_all(attributes, 2048)
+    log_statements:
+      - context: resource
+        statements:
+          - truncate_all(attributes, 2048)
+
+  # Batching. Kept as an explicit processor for clarity. On modern collectors
+  # you may instead drop this and use the exporter's sending_queue.batch.
+  batch: {}
+
+exporters:
+  # CUSTOMIZE the endpoint/auth. Compression (gzip), sending_queue, and
+  # retry_on_failure use OTel exporter defaults unless you override them.
+  otlp:
+    endpoint: ${env:OTLP_EXPORTER_ENDPOINT}
+    # tls: {insecure: false}
+    # headers: {authorization: "Bearer ${env:OTLP_TOKEN}"}
+
+service:
+  extensions: [file_storage/filelog_offsets]
+
+  telemetry:
+    # The collector's own telemetry. detailed level, but drop the noisiest /
+    # highest-cardinality internal series, and report every 30s.
+    metrics:
+      level: detailed
+      readers:
+        - periodic:
+            interval: 30000
+            timeout: 10000
+            exporter:
+              otlp:
+                protocol: grpc
+                endpoint: ${env:OTLP_EXPORTER_ENDPOINT}
+      views:
+        - selector: {instrument_name: otelcol.k8s.pod.association}
+          stream: {aggregation: {drop: {}}}
+        - selector: {instrument_name: http.client.*}
+          stream: {aggregation: {drop: {}}}
+        - selector: {instrument_name: http.server.*}
+          stream: {aggregation: {drop: {}}}
+        - selector: {instrument_name: rpc.*}
+          stream: {aggregation: {drop: {}}}
+        - selector: {instrument_name: otelcol_processor_batch_batch_send_size_bytes}
+          stream: {aggregation: {drop: {}}}

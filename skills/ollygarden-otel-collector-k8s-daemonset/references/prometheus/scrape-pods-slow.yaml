@@ -1,0 +1,27 @@
+# Nested-included into metrics.yaml via the file provider (see metrics.yaml).
+# Expensive endpoints, scraped rarely. Bare scrape-job map.
+job_name: kubernetes-pods-slow
+scrape_interval: 5m
+scrape_timeout: 30s
+kubernetes_sd_configs:
+  - role: pod
+    selectors:
+      - role: pod
+        field: spec.nodeName=${env:K8S_NODE_NAME}
+relabel_configs:
+  - source_labels: [__meta_kubernetes_pod_phase]
+    regex: Pending|Succeeded|Failed|Completed
+    action: drop
+  - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape_slow]
+    regex: "true"
+    action: keep
+  - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scheme]
+    regex: (https?)
+    target_label: __scheme__
+  - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+    regex: (.+)
+    target_label: __metrics_path__
+  - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+    regex: ([^:]+)(?::\d+)?;(\d+)
+    replacement: $1:$2
+    target_label: __address__

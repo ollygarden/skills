@@ -14,9 +14,14 @@ node is already lean. It layers opinions on top of upstream facts:
 - For OTTL statement/condition syntax → the **`otel-ottl`** skill.
 - For source-side fixes that the collector cannot do → the `ollygarden-otel-*` setup skills.
 
-The companion reference config is [`references/daemonset-collector.yaml`](references/daemonset-collector.yaml).
-Read it alongside this file; the prose explains *why*, the YAML shows *how*. Copy it, then
-search for `CUSTOMIZE`.
+The companion reference config is **decomposed by signal pipeline** under
+[`references/`](references/): a shared [`common.yaml`](references/common.yaml) plus
+[`traces.yaml`](references/traces.yaml), [`metrics.yaml`](references/metrics.yaml), and
+[`logs.yaml`](references/logs.yaml), with the Prometheus scrape jobs pulled in from
+[`references/prometheus/`](references/prometheus/). Read them alongside this file; the prose
+explains *why*, the YAML shows *how*. Copy the set, then search for `CUSTOMIZE`. See
+[Decomposing this config](#decomposing-this-config) for how the files merge and how to validate
+them together.
 
 ## When this skill applies
 
@@ -175,30 +180,42 @@ These belong in the gateway/cluster collector, not the node agent:
   once per node — otherwise every node double-counts them. Their tuning (e.g. dropping
   zero-value replicaset datapoints, disabling `k8s.namespace.phase`) lives in that Deployment.
 
+## Decomposing this config
+
+The reference config is split into multiple files, not one monolith: the collector
+**deep-merges** repeated `--config file:` sources, so you can split by concern and have it
+reassemble the whole. The layout we ship is **by signal pipeline** —
+[`common.yaml`](references/common.yaml) for everything shared by all three pipelines, plus a
+self-contained [`traces.yaml`](references/traces.yaml),
+[`metrics.yaml`](references/metrics.yaml), and [`logs.yaml`](references/logs.yaml) (each with
+its own `service.pipelines.<signal>` entry). The Prometheus scrape jobs are pulled in as
+bare-fragment files under [`references/prometheus/`](references/prometheus/) via `${file:}`.
+
+Read [`references/decomposing-config.md`](references/decomposing-config.md) before editing the
+file set. It covers the merge mechanism, the two alternative patterns (split by component type;
+environment overlays), and the five merge caveats that bite silently — most importantly that
+**arrays are replaced, not merged** (keep a pipeline's processor list in one file) and that
+**`${file:}` paths resolve relative to the collector's working directory** (run from inside
+`references/`).
+
 ## Verify before shipping
 
-Validate the config against the collector binary that will run it:
+Validate the **merged** set (never a single fragment) from inside `references/`:
 
 ```sh
-otelcol-contrib validate --config references/daemonset-collector.yaml
+cd references
+otelcol-contrib validate \
+  --config file:common.yaml --config file:traces.yaml \
+  --config file:metrics.yaml --config file:logs.yaml
 ```
 
-`validate` checks structure, component existence, and OTTL syntax, and also instantiates the
-pipeline. Several errors are pure **off-cluster** artifacts: cloud detectors in
-`resourcedetection` (e.g. `eks`) and `kubeletstats` `auth_type: serviceAccount` (it reads the
-SA CA cert at build time) fail because there is no Kubernetes API or service-account mount, and
-`hostmetrics` `root_path: /hostfs` needs the host mount. They disappear when the DaemonSet runs
-in the cluster. A genuine config error (a bad OTTL statement, an unknown component, a misspelled
-key) surfaces during the same phase, so they can mask one: the build aborts at the *first*
-failure. To force the **whole** pipeline to build off-cluster — and thus compile every OTTL
-filter/transform downstream of `resourcedetection` — validate a throwaway overlay with the cloud
-detectors swapped for `[env]` and `kubeletstats` `auth_type: none`; a clean run then means all
-components instantiated and all OTTL compiled. (Validated this way on `otelcol-contrib`
-v0.154.0.)
-
-`validate` does not check that env vars resolve or that OTTL matches your data. After it
-passes, confirm the filters actually drop what you intend with a `debug` exporter and a sample
-of real telemetry (see the `otel-collector` skill's verification guidance).
+`validate` instantiates the pipeline and compiles OTTL, but several errors off-cluster are pure
+artifacts (cloud `resourcedetection` detectors, `kubeletstats` `auth_type: serviceAccount`,
+`hostmetrics` `root_path: /hostfs`) and can mask a real one, since the build aborts at the first
+failure. See [`references/validating.md`](references/validating.md) for the full workflow: the
+`print-config` merge-inspection command, the throwaway off-cluster overlay that forces the whole
+pipeline to build, and why `validate` still can't confirm env resolution or that OTTL matches
+your data.
 
 ## Cross-references
 
