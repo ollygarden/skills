@@ -1,9 +1,58 @@
 ---
 name: ollygarden-otel-go-setup
-description: Ollygarden's recommended pattern for setting up the OpenTelemetry SDK in Go services using otelconf. Covers project structure, the Providers struct, no-op fallback, runtime attribute injection, and the zap log bridge. Use when adding OTel to a Go project, structuring telemetry code, or reviewing an existing setup. Triggers on "go otel setup", "go telemetry pattern", "Providers struct go otel".
+description: Ollygarden's recommended pattern for setting up the OpenTelemetry SDK in Go services using otelconf. Covers project structure, the Providers struct, no-op fallback, runtime attribute injection, and the zap log bridge. Use when adding OTel to a Go project, structuring telemetry code, or reviewing an existing setup — including when DB spans show up as trace roots or GORM/database spans are disconnected from HTTP spans. Triggers on "go otel setup", "go telemetry pattern", "Providers struct go otel", "gorm WithContext", "root client span go".
 ---
 
 # Go SDK Setup Conventions
+
+## Setup Checklist — verify every item before you finish
+
+Setup is not done when the SDK boots. Each unchecked item below produces a specific
+telemetry-quality finding in production; work through all of them.
+
+- [ ] **Thread the request context into the data layer.** Every database, HTTP-client, and
+  queue call on a request path must receive the request's `ctx` — never `context.Background()`
+  and never a bare global handle. With GORM this means `db.WithContext(ctx)` at **every** query
+  site, with the context passed handler → service → model:
+
+  ```go
+  // handler: take ctx from the framework request
+  articles, err := svc.ListArticles(c.Request.Context(), filter)
+
+  // service: every method takes ctx as its first parameter
+  func (s *Service) ListArticles(ctx context.Context, f Filter) ([]Article, error) {
+      return s.repo.List(ctx, f)
+  }
+
+  // repo/model: the only layer touching *gorm.DB
+  func (r *Repo) List(ctx context.Context, f Filter) ([]Article, error) {
+      var out []Article
+      return out, r.db.WithContext(ctx).Where("tag = ?", f.Tag).Find(&out).Error
+  }
+  ```
+
+  Verify by auditing every request-path DB call: each must receive the request context —
+  via `db.WithContext(ctx)`, a per-request `gorm.Session{Context: ctx}`, or `database/sql`'s
+  `QueryContext`/`ExecContext`. A quick spot-check is `grep -rn "WithContext" --include='*.go' .`
+  (zero hits on a GORM codebase is a strong signal the context is not threaded), but the grep
+  alone is not proof — wrappers and reused `*gorm.DB` handles hide call sites, so walk the
+  request paths. Without the request context, DB spans become detached CLIENT-kind trace roots
+  instead of children of the HTTP span (*Root Client Span* finding). Refactoring existing
+  ctx-less signatures across layers is part of setup, not optional follow-up.
+
+- [ ] **Never record SQL parameter values — on any signal.** Bound values must not appear in
+  `db.query.text`, SQL logs, `database/sql` instrumentation attributes, or custom spans; only
+  `?` placeholders are acceptable. With the GORM OTel plugin specifically, pass
+  `tracing.WithoutQueryVariables()`. Raw values in any of these leak PII (Critical
+  *PII Leakage* finding).
+
+- [ ] **Inject `service.instance.id`** (a per-process UUID) alongside `service.version`, as the
+  setup pattern below does programmatically (*Missing service.instance.id* finding).
+
+- [ ] **Keep the resource lean.** `service.name`, `service.version`, `service.instance.id`, and
+  `deployment.environment.name` — that is the full set. Do **not** add `resource.WithOS()`,
+  `resource.WithProcess()`, `resource.WithHost()`, or equivalent detectors: `os.*` and
+  `process.*` resource attributes are discouraged (*Discouraged Resource Attribute* finding).
 
 ## Recommended import path
 
