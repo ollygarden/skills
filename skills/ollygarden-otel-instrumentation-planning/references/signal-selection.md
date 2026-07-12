@@ -125,8 +125,8 @@ boundary. This removes ambiguity and prevents the implement agent from guessing.
 **Required error handling for every manual boundary:**
 
 1. **Set span status to ERROR** when the operation fails from the caller's perspective.
-2. **Record the exception** via the Logs API (not deprecated `span.AddEvent()` or
-   `span.RecordException()`).
+2. **Record the exception** via the Logs API for new instrumentation. The accepted
+   span-events-to-logs migration plan does not itself deprecate every released span event API.
 3. **Set the `error.type` attribute** to the exception class name or error category.
 
 Do NOT set span status to ERROR for:
@@ -136,12 +136,13 @@ Do NOT set span status to ERROR for:
 
 ---
 
-## Span Event API Deprecation
+## Span Events to Logs Migration
 
-Do not use `span.AddEvent()` or `span.RecordException()`. These APIs are deprecated.
-Use the Logs API to emit events. The SDK's event-to-span-event bridge converts log-based
-events to span events for backward compatibility — you get both without calling deprecated
-APIs.
+Prefer the Logs API for new event and exception instrumentation. OTEP 4430 is an accepted
+migration plan, but span event APIs are not yet marked deprecated in the released trace
+specification or consistently across language SDKs. Bridge availability is language- and
+version-specific, so verify it with the `otel-span-events-to-logs-migration` skill before
+claiming that a log record will also appear as a span event.
 
 For domain-specific exceptions, use the semantic convention event names introduced in
 OTel semantic conventions v1.40.0:

@@ -16,7 +16,10 @@ Is zero-code instrumentation sufficient?
           └── Plain Java?  → Autoconfigure SDK extension
 ```
 
-All paths support declarative configuration via `-Dotel.config.file`.
+The Javaagent loads a standalone file via `-Dotel.config.file`. The Spring Boot Starter
+embeds declarative configuration under the `otel` property tree and opts in with
+`otel.file_format`; it does not load `otel.config.file`. Manual autoconfigure needs the
+declarative-config extension in addition to the autoconfigure extension.
 
 ## Path A: Javaagent + Declarative Config (Recommended)
 
@@ -58,10 +61,12 @@ For Spring Boot applications without the Javaagent:
 </dependency>
 ```
 
-Configure via `application.properties` or use declarative config with:
+Configure via `application.yaml`; `otel.file_format` opts into the embedded declarative model:
 
-```properties
-otel.config.file=configs/otel.yaml
+```yaml
+otel:
+  file_format: "1.0" # use the literal supported by the selected Starter release
+  # tracer_provider, meter_provider, logger_provider, instrumentation, ...
 ```
 
 ## Path C: Manual Autoconfigure
@@ -81,17 +86,21 @@ For non-Spring applications without the Javaagent:
     </dependency>
     <dependency>
         <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-sdk-extension-declarative-config</artifactId>
+        <scope>runtime</scope>
+    </dependency>
+    <dependency>
+        <groupId>io.opentelemetry</groupId>
         <artifactId>opentelemetry-exporter-otlp</artifactId>
         <scope>runtime</scope>
     </dependency>
 </dependencies>
 ```
 
-Always use the BOM to align dependency versions.
-
 ## Key Details
 
-- **BOM alignment**: Always import `opentelemetry-bom` to prevent version conflicts.
+- **BOM alignment**: Import `opentelemetry-bom` for stable artifacts and the matching
+  `opentelemetry-bom-alpha` for the alpha declarative-config extension.
 - **API at compile, SDK at runtime**: Depend on `opentelemetry-api` at compile scope, SDK/exporter at runtime. This keeps application code decoupled from SDK internals.
 
 ## Anti-Patterns

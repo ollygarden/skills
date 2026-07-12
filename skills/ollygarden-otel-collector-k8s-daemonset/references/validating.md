@@ -35,7 +35,8 @@ key) surfaces during the same phase, so they can mask one: the build aborts at t
 failure. To force the **whole** pipeline to build off-cluster — and thus compile every OTTL
 filter/transform downstream of `resourcedetection` — validate a throwaway overlay with the cloud
 detectors swapped for `[env]` and `kubeletstats` `auth_type: none`; a clean run then means all
-components instantiated and all OTTL compiled. (Validated this way on `otelcol-contrib` v0.155.0.)
+components instantiated and all OTTL compiled. (Validated this way on `otelcol-contrib` v0.155.0;
+re-run it against the pinned deployment version rather than treating that stamp as evergreen.)
 
 `validate` does not check that env vars resolve or that OTTL matches your data. After it
 passes, confirm the filters actually drop what you intend with a `debug` exporter and a sample

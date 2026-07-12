@@ -164,8 +164,9 @@ exporters, propagators, and processors are allowed.
 For each `manual` boundary, specify in the plan:
 1. **Set span status to ERROR on failure**: always yes when the operation fails from the
    caller's perspective. Do not set ERROR for handled errors or retries that succeed.
-2. **What to record on error**: record the exception via the Logs API (not the deprecated
-   `span.AddEvent()` or `span.RecordException()`). Set the `error.type` attribute.
+2. **What to record on error**: prefer the Logs API for new instrumentation, following the
+   accepted span-events-to-logs migration plan. Span event APIs are not yet deprecated in
+   released specifications or every language SDK. Set the `error.type` attribute.
 3. Follow the error golden rule from `references/signal-selection.md`: either record the
    error OR return with context, never both.
 
