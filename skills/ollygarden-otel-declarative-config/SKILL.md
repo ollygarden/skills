@@ -104,7 +104,7 @@ endpoint: "${OTEL_ENDPOINT}"
 
 When the instrumentation plan marks endpoints as `excluded` (health, readiness, and
 liveness probes — see `ollygarden-otel-instrumentation-planning`), the declarative
-mechanism is a **composite sampler that drops matching spans**. Do NOT reach for
+mechanism is a **rule-based routing sampler that drops matching spans**. Do NOT reach for
 `OTEL_INSTRUMENTATION_*` exclude-path env vars as a second configuration channel unless the
 selected runtime explicitly documents how they combine with file configuration.
 

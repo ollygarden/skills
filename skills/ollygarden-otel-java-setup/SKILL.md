@@ -54,6 +54,24 @@ For manual instrumentation on top of the agent, add the API. Fetch the latest BO
 
 For Spring Boot applications without the Javaagent:
 
+Import the instrumentation BOM so the Starter and its instrumentation dependencies stay
+aligned. This is required with Spring Boot 3.5+, whose dependency management can otherwise
+select an incompatible OpenTelemetry API version.
+
+```xml
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>io.opentelemetry.instrumentation</groupId>
+            <artifactId>opentelemetry-instrumentation-bom</artifactId>
+            <version><!-- latest instrumentation BOM tag --></version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
 ```xml
 <dependency>
     <groupId>io.opentelemetry.instrumentation</groupId>
@@ -99,8 +117,9 @@ For non-Spring applications without the Javaagent:
 
 ## Key Details
 
-- **BOM alignment**: Import `opentelemetry-bom` for stable artifacts and the matching
-  `opentelemetry-bom-alpha` for the alpha declarative-config extension.
+- **BOM alignment**: Use `opentelemetry-instrumentation-bom` for the Spring Boot Starter.
+  Use `opentelemetry-bom` for stable core SDK artifacts and the matching
+  `opentelemetry-bom-alpha` for the alpha declarative-config extension in manual setup.
 - **API at compile, SDK at runtime**: Depend on `opentelemetry-api` at compile scope, SDK/exporter at runtime. This keeps application code decoupled from SDK internals.
 
 ## Anti-Patterns

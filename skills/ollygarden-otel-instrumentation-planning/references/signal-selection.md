@@ -127,6 +127,8 @@ boundary. This removes ambiguity and prevents the implement agent from guessing.
 1. **Set span status to ERROR** when the operation fails from the caller's perspective.
 2. **Record the exception** via the Logs API for new instrumentation. The accepted
    span-events-to-logs migration plan does not itself deprecate every released span event API.
+   Preserve the exception object when the language API supports it; otherwise set
+   `exception.type`, `exception.message`, and `exception.stacktrace` on the log record.
 3. **Set the `error.type` attribute** to the exception class name or error category.
 
 Do NOT set span status to ERROR for:
