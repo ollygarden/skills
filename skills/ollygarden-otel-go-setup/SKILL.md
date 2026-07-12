@@ -31,14 +31,20 @@ telemetry-quality finding in production; work through all of them.
   }
   ```
 
-  Verify with `grep -rn "WithContext" --include='*.go' .` — expect a hit at every query site.
-  Zero hits means every DB span becomes a detached CLIENT-kind trace root instead of a child
-  of the HTTP span (*Root Client Span* finding). Refactoring existing ctx-less signatures
-  across layers is part of setup, not optional follow-up.
+  Verify by auditing every request-path DB call: each must receive the request context —
+  via `db.WithContext(ctx)`, a per-request `gorm.Session{Context: ctx}`, or `database/sql`'s
+  `QueryContext`/`ExecContext`. A quick spot-check is `grep -rn "WithContext" --include='*.go' .`
+  (zero hits on a GORM codebase is a strong signal the context is not threaded), but the grep
+  alone is not proof — wrappers and reused `*gorm.DB` handles hide call sites, so walk the
+  request paths. Without the request context, DB spans become detached CLIENT-kind trace roots
+  instead of children of the HTTP span (*Root Client Span* finding). Refactoring existing
+  ctx-less signatures across layers is part of setup, not optional follow-up.
 
-- [ ] **Never record SQL parameter values.** With the GORM OTel plugin, pass
-  `tracing.WithoutQueryVariables()` so `db.query.text` contains `?` placeholders, never user
-  data. Raw values in query text leak PII (Critical *PII Leakage* finding).
+- [ ] **Never record SQL parameter values — on any signal.** Bound values must not appear in
+  `db.query.text`, SQL logs, `database/sql` instrumentation attributes, or custom spans; only
+  `?` placeholders are acceptable. With the GORM OTel plugin specifically, pass
+  `tracing.WithoutQueryVariables()`. Raw values in any of these leak PII (Critical
+  *PII Leakage* finding).
 
 - [ ] **Inject `service.instance.id`** (a per-process UUID) alongside `service.version`, as the
   setup pattern below does programmatically (*Missing service.instance.id* finding).
