@@ -154,16 +154,16 @@ willing to let `:Z` relabel (see Stage 3), never your only copy of a shared conf
 mkdir -p ./out
 
 $RUNTIME run -d --rm --name otelcol-verify \
-  --network host \
+  -p 127.0.0.1:4317:4317 \
   --user "$(id -u):$(id -g)" \
   -v "$(pwd)/harness.yaml:/etc/otelcol-contrib/config.yaml:ro$SEL" \
   -v "$(pwd)/out:/output$SEL" \
-  otel/opentelemetry-collector-contrib:0.155.0 \
+  otel/opentelemetry-collector-contrib:0.156.0 \
   --config=/etc/otelcol-contrib/config.yaml
 
 # wait until the collector reports ready, then feed it. Grepping the runtime's own
-# logs is portable — it works on any host OS and whether you used host or bridge
-# networking, unlike a host-side port probe (ss/nc aren't on macOS).
+# logs is portable across host operating systems, unlike a host-side port probe
+# (ss/nc aren't available by default on macOS).
 until $RUNTIME logs otelcol-verify 2>&1 | grep -q "Everything is ready"; do sleep 0.25; done
 telemetrygen traces --otlp-insecure --traces 1 --service "checkout"
 ```
@@ -178,14 +178,13 @@ Two runtime caveats:
 - **`--user "$(id -u):$(id -g)"`** lets the `file` exporter write to the bind-mounted output
   dir as you. On **rootless Podman** the container already runs as your user, so this flag is
   usually unnecessary and can even mismap — drop it if the file exporter can't write.
-- **`--network host`** lets `telemetrygen` on the host reach `localhost:4317`. It works cleanly
-  on Linux. On **Docker Desktop (macOS/Windows)** host networking is limited; instead publish
-  the port (`-p 4317:4317`) and keep targeting `localhost:4317`, or run telemetrygen as a second
-  container on a shared network.
-- **Pin a recent release tag** — `0.155.0` above is illustrative; use the current released
+- **`-p 127.0.0.1:4317:4317`** lets host-side `telemetrygen` reach `localhost:4317` without
+  exposing the unauthenticated test receiver on external host interfaces. If loopback port
+  publishing is unavailable, run telemetrygen as a second container on a private shared network.
+- **Pin a recent release tag** — `0.156.0` above is illustrative; use the current released
   version so the component under test behaves as it will in production. Mind the tag formats:
-  the Docker Hub `otel/opentelemetry-collector-contrib` image is **unprefixed** (`:0.155.0`),
-  while the ghcr `telemetrygen` image is **`v`-prefixed** (`:v0.155.0`). See `otel-telemetrygen`
+  the Docker Hub `otel/opentelemetry-collector-contrib` image is **unprefixed** (`:0.156.0`),
+  while the ghcr `telemetrygen` image is **`v`-prefixed** (`:v0.156.0`). See `otel-telemetrygen`
   for the telemetrygen image.
 
 ### Stage 5 — Assert the output

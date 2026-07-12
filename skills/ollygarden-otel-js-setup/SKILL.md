@@ -38,12 +38,12 @@ configs/
 ## Instrumentation File (`src/telemetry/setup.ts`)
 
 ```typescript
-import { NodeSDK } from '@opentelemetry/sdk-node';
+import { startNodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 
-// When OTEL_CONFIG_FILE is set, NodeSDK reads config from that file.
-// Exporters, processors, samplers, and resource are all configured via YAML.
-export const sdk = new NodeSDK({
+// startNodeSDK loads OTEL_CONFIG_FILE and registers the configured providers.
+// new NodeSDK(...) is the separate programmatic path and does not load the file.
+export const sdk = startNodeSDK({
   instrumentations: [
     getNodeAutoInstrumentations({
       '@opentelemetry/instrumentation-fs': { enabled: false },
@@ -59,7 +59,6 @@ export const sdk = new NodeSDK({
 ```typescript
 // IMPORTANT: Import and start telemetry BEFORE any other imports
 import { sdk } from './telemetry/setup';
-sdk.start();
 
 import { app } from './app';
 

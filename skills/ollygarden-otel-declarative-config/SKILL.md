@@ -10,15 +10,16 @@ description: Ollygarden's recommended patterns and anti-patterns for OpenTelemet
 Prefer declarative YAML configuration over scattered `OTEL_*` environment variables and over
 programmatic SDK construction:
 
-- It's language-agnostic (same YAML works across Go, Java, JS, etc.)
+- It uses a shared schema across languages, subject to each runtime's released support matrix
 - It's version-controlled alongside application code
 - It expresses things env vars cannot: views, composite samplers, multiple exporters
 - It supports `${VAR}` substitution for secrets and environment-specific values
 
 ## When to recommend declarative config
 
-Recommend it when the user is setting up the OTel SDK for Go, Java, or JS. These SDKs have
-stable or near-stable implementations.
+Recommend it when the selected Go, Java, or JS runtime release supports the configuration
+features the project needs. Several implementations and activation APIs remain experimental,
+so verify the exact runtime and version first.
 
 For .NET and Python, fall back to environment variables or programmatic setup — declarative
 config is still in development. To check the current per-language status, fetch the SDK
@@ -72,8 +73,9 @@ resource:
   must be wired into the runtime (CI build arg, container env, k8s manifest). That wiring
   is the deployment layer's responsibility, not this config file's — but the config MUST
   list which vars it expects.
-- **Do NOT set `service.instance.id`.** Omit it; let the SDK generate one per replica.
-  Hardcoding it makes every replica report the same id and corrupts per-instance metrics.
+- **Do NOT hardcode `service.instance.id`.** Generate or inject a unique value per process when
+  the selected SDK does not do so automatically. A shared literal makes every replica report
+  the same id and corrupts per-instance metrics.
 - **Do NOT set `telemetry.sdk.*`, host, container, k8s, or process attributes.** Resource
   detectors populate these automatically. Hardcoding produces wrong data.
 
@@ -102,9 +104,9 @@ endpoint: "${OTEL_ENDPOINT}"
 
 When the instrumentation plan marks endpoints as `excluded` (health, readiness, and
 liveness probes — see `ollygarden-otel-instrumentation-planning`), the declarative
-mechanism is a **composite sampler that drops matching spans**. Do NOT reach for
-`OTEL_INSTRUMENTATION_*` exclude-path env vars — they are ignored when a config file is
-active (see *Mixing env vars and config file* below).
+mechanism is a **rule-based routing sampler that drops matching spans**. Do NOT reach for
+`OTEL_INSTRUMENTATION_*` exclude-path env vars as a second configuration channel unless the
+selected runtime explicitly documents how they combine with file configuration.
 
 Nest a rule-based routing sampler as the `root` of `parent_based`, keeping your normal
 ratio sampler as its fallback:
@@ -185,17 +187,18 @@ headers:
 ### Mixing env vars and config file
 
 ```bash
-# BAD: when a config file is set, OTEL_* knobs are IGNORED — sampling,
-#      instrumentation exclude-patterns, propagators, everything.
+# BAD: assuming OTEL_* knobs merge predictably with a config file.
 export OTEL_CONFIG_FILE="/app/otel.yaml"
-export OTEL_TRACES_SAMPLER="always_off"              # NO effect
-export OTEL_INSTRUMENTATION_HTTP_EXCLUDE_PATTERNS="" # NO effect (any OTEL_INSTRUMENTATION_*)
+export OTEL_TRACES_SAMPLER="always_off"              # precedence varies by runtime
+export OTEL_INSTRUMENTATION_HTTP_EXCLUDE_PATTERNS="" # do not assume this merges with the file
 ```
 
-With the exception of `${VAR}` substitution **inside** the YAML, the SDK ignores
-environment variables when a config file is active. Anything you would normally set via
-`OTEL_*` must move into the config file — health-check exclusion becomes the
-`rule_based_routing` sampler above, not an env var.
+Configuration precedence and automatic file loading are runtime-specific. Do not mix an
+`OTEL_CONFIG_FILE` deployment with separate SDK-setting `OTEL_*` variables unless the selected
+runtime documents that combination. Keep SDK settings in the config model; reserve environment
+variables for `${VAR}` substitution inside it. Health-check exclusion becomes the
+`rule_based_routing` sampler above when that sampler is supported, not a second configuration
+channel.
 
 ## Cross-References
 

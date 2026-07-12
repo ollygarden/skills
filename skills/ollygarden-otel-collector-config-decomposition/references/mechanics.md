@@ -77,9 +77,9 @@ status_code:
    ```yaml
    # builder.yaml
    providers:
-     - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.57.0
-     - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.57.0
-     - gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.57.0
+     - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.62.0
+     - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.62.0
+     - gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.62.0
    ```
 
 5. **`${...}` tokens in _comments_ can still expand — in nested fragments.** A literal
