@@ -1,0 +1,65 @@
+name: Skill or enhancement proposal
+description: Propose a new skill or a substantive improvement to an existing skill
+title: "[Proposal]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Skills here package OllyGarden workflows and opinions while delegating vendor-neutral OpenTelemetry facts to the companion opentelemetry-agent-skills repository. Explain how the proposal improves agent outcomes without duplicating maintained sources.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Proposal type
+      options:
+        - New skill
+        - Existing skill enhancement
+        - Lookup script or reference improvement
+        - Repository tooling or integration
+    validations:
+      required: true
+  - type: input
+    id: area
+    attributes:
+      label: Proposed skill or component
+      placeholder: ollygarden-<name>
+    validations:
+      required: true
+  - type: textarea
+    id: use_cases
+    attributes:
+      label: User prompts and use cases
+      description: Give representative prompts that should trigger or benefit from this change.
+    validations:
+      required: true
+  - type: textarea
+    id: gap
+    attributes:
+      label: Current gap
+      description: Explain what agents get wrong, miss, or retrieve inefficiently today.
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: Sources of truth
+      description: Link the OllyGarden guidance and upstream facts the skill should retrieve.
+    validations:
+      required: true
+  - type: textarea
+    id: evaluation
+    attributes:
+      label: Evaluation plan
+      description: Describe the same-model, same-harness A/B prompts that could prove this change helps.
+    validations:
+      required: true
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Project principles
+      options:
+        - label: The proposal is an OllyGarden-owned workflow or opinion.
+          required: true
+        - label: The proposal delegates vendor-neutral OpenTelemetry facts to the companion skills.
+          required: true
+        - label: I searched existing skills and issues for overlap.
+          required: true

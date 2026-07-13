@@ -1,4 +1,7 @@
-# Skills
+# OllyGarden Agent Skills
+
+[![CLA](https://img.shields.io/badge/CLA-required-blue.svg)](CLA.md)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 Public OllyGarden AI skills for [Rose](https://github.com/ollygarden/rose) and the broader OllyGarden ecosystem. Skills are self-contained folders that package instructions, scripts, and resources for AI coding agents.
 
@@ -66,6 +69,21 @@ All skill `name:` fields carry an `ollygarden-` prefix to declare ownership in t
 | [`ollygarden-otel-collector-k8s-daemonset`](skills/ollygarden-otel-collector-k8s-daemonset/) | OllyGarden's opinionated, optimization-first OTel Collector config for a Kubernetes node agent (DaemonSet): drop early at the node, curated receivers, noise/cardinality/cost reduction across logs, metrics, traces. |
 | [`ollygarden-otel-collector-config-validation`](skills/ollygarden-otel-collector-config-validation/) | OllyGarden's end-to-end method for validating a collector config: `otelcol validate`, then a real collector in Docker/Podman fed by telemetrygen with a file exporter, asserting that a processor or connector actually transforms, drops, or routes telemetry as intended. |
 | [`ollygarden-otel-collector-config-decomposition`](skills/ollygarden-otel-collector-config-decomposition/) | OllyGarden's opinion on when and how to decompose a monolithic OTel Collector config into multiple merged files — and when to leave it alone. Executes the split by concern (deep-merged `--config file:` sources), verifies the merged result is behavior-equivalent, and reports the reasoning, including a deliberate no-op for configs simple enough not to need it. |
+
+## Contributing
+
+Contributions are welcome, including pull requests authored or implemented with AI coding agents.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for skill conventions, validation, evaluation evidence, and
+pull request expectations. First-time contributors sign the [OllyGarden CLA](CLA.md) through the
+pull request bot.
+
+## Community and support
+
+- [Support](SUPPORT.md) — where to report defects, propose skills, and ask focused questions.
+- [Governance](GOVERNANCE.md) — project principles, decision-making, and contributor and maintainer roles.
+- [Code of Conduct](CODE_OF_CONDUCT.md) — the conduct standard and private incident reporting.
+- [Security policy](SECURITY.md) — supported versions and private vulnerability reporting.
+- [Contributor License Agreement](CLA.md) — contribution terms and signing instructions.
 
 ## License
 

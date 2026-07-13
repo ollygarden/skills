@@ -1,0 +1,51 @@
+name: Bug report
+description: Report incorrect, outdated, unsafe, or broken repository behavior
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve the project. For security vulnerabilities, stop here and follow [SECURITY.md](https://github.com/ollygarden/skills/security/policy) instead.
+  - type: input
+    id: area
+    attributes:
+      label: Affected skill or component
+      description: Name the skill, script, workflow, or other file involved.
+      placeholder: ollygarden-cli, a lookup script, the marketplace, ...
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe what is incorrect or broken and why it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Include the prompt or command, agent or harness, model, relevant output, and minimal reproduction steps.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened instead?
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Relevant source
+      description: Link the OllyGarden or upstream source that supports the expected behavior, when available.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I removed credentials, customer data, and other sensitive information.
+          required: true
+        - label: I searched existing issues for a duplicate.
+          required: true
