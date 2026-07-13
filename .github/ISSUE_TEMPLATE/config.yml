@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/ollygarden/skills/security/policy
+    about: Follow the private reporting instructions in SECURITY.md; do not open a public issue.
+  - name: Read the support guide
+    url: https://github.com/ollygarden/skills/blob/main/SUPPORT.md
+    about: Choose the right channel and include the context maintainers need to help.

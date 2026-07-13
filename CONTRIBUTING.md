@@ -1,44 +1,105 @@
-# Contributing to Skills
+# Contributing to OllyGarden Skills
 
 Thank you for your interest in contributing!
 
-## Getting Started
+By participating, you agree to follow the project [Code of Conduct](CODE_OF_CONDUCT.md). Report
+suspected vulnerabilities privately under [SECURITY.md](SECURITY.md), not through a public issue or
+pull request. For questions and issue-routing guidance, see [SUPPORT.md](SUPPORT.md).
 
-1. Fork and clone the repository
-2. Create a feature branch from `main`
-3. Make your changes
-4. Open a pull request
+## Contributions from AI coding agents
 
-## Adding a Skill
+We accept and encourage pull requests authored or implemented with AI coding agents. Agent-authored
+changes are held to the same bar as any other contribution:
 
-Prefer using the [`skill-creator`](https://github.com/anthropics/skills/tree/main/skill-creator) skill to scaffold and refine new skills rather than authoring them by hand — it walks you through the structure and helps keep skills well-scoped.
+- A human contributor must own the pull request, review the agent's output, and be able to respond
+  to review feedback.
+- Disclose agent involvement in the pull request description.
+- The evaluation requirement below applies regardless of who or what wrote the change.
 
-Skills live under `skills/<skill-name>/` and must follow the [Agent Skills specification](https://agentskills.io/specification). Each must include a `SKILL.md` with YAML frontmatter (`name` and `description`), where the directory name matches the `name` field. Optional subdirectories: `scripts/`, `references/`, `assets/`.
+## Getting started
 
-Validate your skill locally before opening a pull request to confirm it conforms to the spec and activates as intended.
+1. Search existing issues and pull requests for related work.
+2. For a new skill or substantial design change, open a proposal before investing in the implementation.
+3. Fork and clone the repository.
+4. Create a focused feature branch from the latest `main`.
+5. Make and validate your changes.
+6. Open a pull request using the repository template and respond to review feedback.
 
-When you add or rename a skill, keep all three registration points in sync: the `skills/<skill-name>/SKILL.md` directory, the `plugins` entry in `.claude-plugin/marketplace.json`, and the table and layout tree in `README.md`.
+## Adding or changing a skill
 
-## Commit Messages
+Prefer using the [`skill-creator`](https://github.com/anthropics/skills/tree/main/skill-creator)
+skill to scaffold and refine new skills rather than authoring them by hand.
 
-We use [Conventional Commits](https://www.conventionalcommits.org/). Format:
+Skills live under `skills/<skill-name>/` and must follow the
+[Agent Skills specification](https://agentskills.io/specification). Each skill must include a
+`SKILL.md` with YAML frontmatter containing `name` and `description`; the directory name must match
+the `name` field. Skill names in this repository use the `ollygarden-` prefix. Optional
+subdirectories include `scripts/`, `references/`, and `assets/`.
 
+Validate spec conformance locally with the
+[`skills-ref`](https://github.com/agentskills/agentskills/tree/main/skills-ref) reference tool:
+
+```bash
+skills-ref validate skills/<skill-name>
 ```
-<type>: <short description>
 
-<optional body>
+When you add or rename a skill, keep all three registration points in sync:
+
+1. `skills/<skill-name>/SKILL.md`;
+2. the plugin entry in `.claude-plugin/marketplace.json`; and
+3. the Available Skills table and layout tree in `README.md`.
+
+### Keep opinions and upstream facts separate
+
+This repository contains OllyGarden-owned workflows and opinions. Vendor-neutral OpenTelemetry
+facts belong in the companion
+[`opentelemetry-agent-skills`](https://github.com/ollygarden/opentelemetry-agent-skills) repository.
+Reference those upstream skills for semantic conventions, SDK versions, component configuration,
+and OTTL syntax instead of duplicating them here. Keep skills token-efficient by preferring targeted
+lookups and progressive disclosure over broad copied context.
+
+## Proving the skill helps: harness results
+
+Every pull request that adds a skill or substantively changes one must include evaluation results
+showing that the skill improves agent output:
+
+1. Choose representative prompts that exercise the changed behavior.
+2. Run each prompt without the skill on a frontier model in a fresh session.
+3. Run the same prompt with the skill using the same model and harness in another fresh session.
+4. Include the prompts, model and harness versions, a comparison of the results, and links to the
+   transcripts in the pull request description.
+
+Useful evidence includes correcting stale or inaccurate guidance, avoiding wrong turns, retrieving
+the right source more efficiently, or applying OllyGarden's intended workflow consistently. If the
+comparison shows no meaningful improvement, refine the skill before submitting it.
+
+## Commit messages
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) with an optional skill scope:
+
+```text
+<type>(<optional scope>): <short description>
 ```
 
-Common types:
+Common types are `feat`, `fix`, `docs`, `chore`, and `refactor`.
 
-- `feat` — new skill or feature
-- `fix` — bug fix
-- `docs` — documentation only
-- `chore` — maintenance, CI, tooling
-- `refactor` — code restructuring without behavior change
+## Pull requests
 
-## Pull Requests
+- Keep the pull request focused on a single change.
+- Include a summary, motivation, validation results, and agent-involvement disclosure.
+- Include harness comparison results for new or substantively changed skills.
+- Update every registration point when adding, renaming, or removing a skill.
+- Confirm documentation links resolve and generated artifacts were regenerated rather than
+  hand-edited.
+- Ensure required checks pass and address maintainer review before merge.
 
-- Keep PRs focused on a single change
-- Include a summary and test plan in the PR description
-- Update `README.md` if adding or removing a skill
+## Contributor License Agreement
+
+Before we can merge your first pull request, you must sign the OllyGarden
+[Contributor License Agreement](CLA.md). The CLA bot comments with instructions; sign by replying
+with the requested confirmation. You only need to sign once for this repository.
+
+## License and conduct
+
+Contributions are accepted under the [Apache License 2.0](LICENSE) and the [OllyGarden CLA](CLA.md).
+All project interactions are governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
