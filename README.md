@@ -1,6 +1,6 @@
 # OllyGarden Agent Skills
 
-[![CLA](https://img.shields.io/badge/CLA-required-blue.svg)](CLA.md)
+[![CLA](https://img.shields.io/badge/CLA-required-blue.svg)](https://github.com/ollygarden/.github/blob/main/CLA.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 Public OllyGarden AI skills for [Rose](https://github.com/ollygarden/rose) and the broader OllyGarden ecosystem. Skills are self-contained folders that package instructions, scripts, and resources for AI coding agents.
@@ -74,16 +74,17 @@ All skill `name:` fields carry an `ollygarden-` prefix to declare ownership in t
 
 Contributions are welcome, including pull requests authored or implemented with AI coding agents.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for skill conventions, validation, evaluation evidence, and
-pull request expectations. First-time contributors sign the [OllyGarden CLA](CLA.md) through the
-pull request bot.
+pull request expectations. First-time contributors sign the organization-wide
+[OllyGarden CLA](https://github.com/ollygarden/.github/blob/main/CLA.md) through the pull request
+bot.
 
 ## Community and support
 
 - [Support](SUPPORT.md) — where to report defects, propose skills, and ask focused questions.
-- [Governance](GOVERNANCE.md) — project principles, decision-making, and contributor and maintainer roles.
-- [Code of Conduct](CODE_OF_CONDUCT.md) — the conduct standard and private incident reporting.
-- [Security policy](SECURITY.md) — supported versions and private vulnerability reporting.
-- [Contributor License Agreement](CLA.md) — contribution terms and signing instructions.
+- [Governance](https://github.com/ollygarden/.github/blob/main/GOVERNANCE.md) — organization-wide project roles and decision-making.
+- [Code of Conduct](https://github.com/ollygarden/.github/blob/main/CODE_OF_CONDUCT.md) — the conduct standard and private incident reporting.
+- [Security policy](https://github.com/ollygarden/skills/security/policy) — supported versions and private vulnerability reporting.
+- [Contributor License Agreement](https://github.com/ollygarden/.github/blob/main/CLA.md) — organization-wide contribution terms and signing instructions.
 
 ## License
 

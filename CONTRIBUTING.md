@@ -2,9 +2,11 @@
 
 Thank you for your interest in contributing!
 
-By participating, you agree to follow the project [Code of Conduct](CODE_OF_CONDUCT.md). Report
-suspected vulnerabilities privately under [SECURITY.md](SECURITY.md), not through a public issue or
-pull request. For questions and issue-routing guidance, see [SUPPORT.md](SUPPORT.md).
+By participating, you agree to follow OllyGarden's organization-wide
+[Code of Conduct](https://github.com/ollygarden/.github/blob/main/CODE_OF_CONDUCT.md). Report
+suspected vulnerabilities privately under the inherited
+[security policy](https://github.com/ollygarden/skills/security/policy), not through a public issue
+or pull request. For questions and issue-routing guidance, see [SUPPORT.md](SUPPORT.md).
 
 ## Contributions from AI coding agents
 
@@ -96,10 +98,13 @@ Common types are `feat`, `fix`, `docs`, `chore`, and `refactor`.
 ## Contributor License Agreement
 
 Before we can merge your first pull request, you must sign the OllyGarden
-[Contributor License Agreement](CLA.md). The CLA bot comments with instructions; sign by replying
-with the requested confirmation. You only need to sign once for this repository.
+[Contributor License Agreement](https://github.com/ollygarden/.github/blob/main/CLA.md). The CLA bot
+comments with instructions; sign by replying with the requested confirmation. You only need to
+sign once for this repository.
 
 ## License and conduct
 
-Contributions are accepted under the [Apache License 2.0](LICENSE) and the [OllyGarden CLA](CLA.md).
-All project interactions are governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+Contributions are accepted under the [Apache License 2.0](LICENSE) and the organization-wide
+[OllyGarden CLA](https://github.com/ollygarden/.github/blob/main/CLA.md). All project interactions
+are governed by OllyGarden's
+[Code of Conduct](https://github.com/ollygarden/.github/blob/main/CODE_OF_CONDUCT.md).

@@ -24,5 +24,5 @@
 - [ ] Content keeps OllyGarden opinions separate from upstream OpenTelemetry facts
 - [ ] Harness comparison results included above — if skill content changed
 - [ ] Commit messages follow Conventional Commits
-- [ ] I have signed (or will sign via the CLA bot on this PR) the [OllyGarden CLA](../CLA.md)
-- [ ] I have read and will follow the [Code of Conduct](../CODE_OF_CONDUCT.md)
+- [ ] I have signed (or will sign via the CLA bot on this PR) the [OllyGarden CLA](https://github.com/ollygarden/.github/blob/main/CLA.md)
+- [ ] I have read and will follow the [Code of Conduct](https://github.com/ollygarden/.github/blob/main/CODE_OF_CONDUCT.md)

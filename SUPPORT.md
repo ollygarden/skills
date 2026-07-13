@@ -8,7 +8,8 @@ This community repository is maintained on a best-effort basis and does not prov
   [skill-proposal form](https://github.com/ollygarden/skills/issues/new?template=skill_proposal.yml).
 - Ask a focused usage question by opening a regular
   [GitHub issue](https://github.com/ollygarden/skills/issues/new).
-- Report suspected vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+- Report suspected vulnerabilities privately under the inherited
+  [security policy](https://github.com/ollygarden/skills/security/policy).
 - Contact OllyGarden about commercial support through the
   [OllyGarden contact page](https://ollygarden.com/contact).
 
