@@ -54,6 +54,14 @@ telemetry-quality finding in production; work through all of them.
   `resource.WithProcess()`, `resource.WithHost()`, or equivalent detectors: `os.*` and
   `process.*` resource attributes are discouraged (*Discouraged Resource Attribute* finding).
 
+- [ ] **Honor the standard `OTEL_*` environment variables end-to-end.** `OTEL_EXPORTER_OTLP_*`,
+  `OTEL_SERVICE_NAME`, and `OTEL_RESOURCE_ATTRIBUTES` must all take effect at runtime. Do not
+  invent custom environment variables (`DEPLOYMENT_ENVIRONMENT`, `SERVICE_VERSION`, ...) for
+  values the standard variables already express, and never overwrite an attribute supplied via
+  `OTEL_RESOURCE_ATTRIBUTES` with a code-level default — a hardcoded fallback like
+  `deployment.environment.name = "development"` silently clobbers the deployment's real
+  environment and misfiles every signal the service emits.
+
 ## Recommended import path
 
 For new code, use the root `otelconf` package (`go.opentelemetry.io/contrib/otelconf`) — it
