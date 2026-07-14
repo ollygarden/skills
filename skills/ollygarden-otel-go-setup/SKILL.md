@@ -46,6 +46,12 @@ telemetry-quality finding in production; work through all of them.
   `tracing.WithoutQueryVariables()`. Raw values in any of these leak PII (Critical
   *PII Leakage* finding).
 
+- [ ] **Configure the SDK declaratively, not in code.** Exporters, processors, sampling, and
+  signal wiring live in an external YAML file (`configs/otel.yaml`) parsed with `otelconf` —
+  use the Setup Pattern below, not hand-constructed exporter/provider code. Operators must be
+  able to change the telemetry setup without recompiling, and the app must fall back to no-op
+  providers when the file is absent.
+
 - [ ] **Inject `service.instance.id`** (a per-process UUID) alongside `service.version`, as the
   setup pattern below does programmatically (*Missing service.instance.id* finding).
 
