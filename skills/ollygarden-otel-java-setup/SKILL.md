@@ -31,6 +31,24 @@ telemetry-quality finding in production; work through all of them.
   the Collector.) Verify by sending a request with a known marker value in a query parameter
   and inspecting the exported span: the attribute must show `REDACTED`, not the marker.
 
+- [ ] **Keep startup database work from polluting trace shapes and span names.** Schema
+  init and migration statements run before any request exists, so JDBC instrumentation
+  emits them as parentless CLIENT **root** spans (*Root Client Span* finding). Worse, an
+  unnamed in-memory database bakes a per-boot identifier into every DB span name for the
+  process's whole lifetime: H2's default unnamed `mem:` URL yields names like
+  `INSERT 14a46930-c29a-4fbb-….owners` with a fresh UUID on each restart — unbounded
+  span-name cardinality. Two obligations:
+  1. Give in-memory/embedded databases a **stable name** (e.g.
+     `jdbc:h2:mem:appdb;DB_CLOSE_DELAY=-1`) so `db.namespace` — and with it every DB span
+     name — is bounded.
+  2. Decide startup-span policy explicitly: wrap initialization in an explicit
+     application-startup span where the framework allows, or drop init-phase DB spans (SDK
+     sampler or Collector rule) when they carry no operational value. Do not ship detached
+     DB roots by default.
+
+  Verify by booting the app and inspecting the first exported traces: no parentless CLIENT
+  roots, and no random per-boot identifiers anywhere in span names.
+
 ## Setup Decision Tree
 
 ```
