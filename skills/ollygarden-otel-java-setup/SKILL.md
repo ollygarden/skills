@@ -1,6 +1,6 @@
 ---
 name: ollygarden-otel-java-setup
-description: Ollygarden's recommended pattern for setting up OpenTelemetry in Java services. Covers the Javaagent vs Spring Boot Starter vs manual autoconfigure decision-making, the Maven BOM dependency pattern, and the setup checklist (query-parameter redaction). Use when adding OTel to a Java project, choosing a setup path, or reviewing dependency declarations. Triggers on "java otel setup", "javaagent vs starter", "opentelemetry-bom", "url.query redaction", "query parameter PII".
+description: Ollygarden's recommended pattern for setting up OpenTelemetry in Java services. Covers the Javaagent vs Spring Boot Starter vs manual autoconfigure decision-making, the Maven BOM dependency pattern, and the setup checklist (no query strings in telemetry, startup DB span hygiene). Use when adding OTel to a Java project, choosing a setup path, or reviewing dependency declarations. Triggers on "java otel setup", "javaagent vs starter", "opentelemetry-bom", "url.query", "query parameter PII".
 ---
 
 # Java SDK Setup Conventions
@@ -10,26 +10,23 @@ description: Ollygarden's recommended pattern for setting up OpenTelemetry in Ja
 Setup is not done when the SDK boots. Each unchecked item below produces a specific
 telemetry-quality finding in production; work through all of them.
 
-- [ ] **Redact user-identifiable query parameters from URL attributes.** HTTP server and
-  client instrumentation — Javaagent and Spring Boot Starter alike — capture the full query
-  string in `url.query` / `url.full`. The built-in redaction covers only credential
-  parameters (`AWSAccessKeyId`, `Signature`, `sig`, `X-Goog-Signature`); application
-  parameters carrying personal data are exported **verbatim** — think
-  `GET /owners?lastName=Smith` or any GET search form (Critical *PII Leakage* finding).
-  Enumerate every GET form and query parameter that can carry user data, then configure:
-
-  ```properties
-  # NOTE: full override, not additive — re-list the credential defaults too
-  otel.instrumentation.sanitization.url.experimental.sensitive-query-parameters=\
-    AWSAccessKeyId,Signature,sig,X-Goog-Signature,lastName,email,q
-  ```
-
-  (Declarative config: `general.sanitization.url.sensitive_query_parameters` under
-  `instrumentation/development`. Older 2.x releases only had the client-side
-  `otel.instrumentation.http.client.experimental.redact-query-parameters`, since removed —
-  there, or where no knob applies, scrub `url.query`/`url.full` in a `SpanProcessor` or at
-  the Collector.) Verify by sending a request with a known marker value in a query parameter
-  and inspecting the exported span: the attribute must show `REDACTED`, not the marker.
+- [ ] **Do not export query strings.** Telemetry must not capture data that can carry
+  user input by default, and the query string is exactly that — yet Java HTTP
+  instrumentation (Javaagent and Spring Boot Starter alike) exports it out of the box:
+  `url.query` on server spans, inside `url.full` on client spans, with only four
+  credential parameters redacted. Anything else — `GET /owners?lastName=Smith`, search
+  terms, tokens in links — goes out verbatim (Critical *PII Leakage* finding). No property
+  turns the capture off (see the `otel-java` skill's
+  `references/sensitive-data-capture.md` for the mechanics), so strip it in
+  post-processing: overwrite `url.query`/`url.full` in a `SpanProcessor` (autoconfigure
+  SPI bean for the Starter, extension jar for the Javaagent), or delete/rewrite the
+  attributes in a Collector `transform`/`redaction` processor when every export path goes
+  through a Collector you control. The route template (`url.path`, `http.route`) already
+  answers "which endpoint"; if a specific parameter is genuinely needed as telemetry,
+  capture it deliberately as a bounded, named attribute — never by keeping the raw query
+  string. The same default-deny applies to the opt-in header and servlet-parameter capture
+  knobs: leave them off. Verify by sending a request with a known marker value in a query
+  parameter and inspecting the exported span: the marker must not appear anywhere.
 
 - [ ] **Keep startup database work from polluting trace shapes and span names.** Schema
   init and migration statements run before any request exists, so JDBC instrumentation
