@@ -27,10 +27,25 @@ ollygarden auth status      # validates the token via /organization (exit 3 = no
 ```
 
 If `auth status` exits non-zero, go to section 2. If `ollygarden` itself is
-missing, install it:
+missing, confirm with the user before installing anything. Never pipe a remote
+script to the shell. Install with a Go toolchain:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ollygarden/ollygarden-cli/main/install.sh | sh
+go install github.com/ollygarden/ollygarden-cli/cmd/ollygarden@latest
+```
+
+Or, without Go, download a pinned release and verify its checksum before
+extracting (releases at https://github.com/ollygarden/ollygarden-cli/releases):
+
+```bash
+VERSION=v0.1.1   # pin to the latest tagged release
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+ASSET="ollygarden_${VERSION#v}_${OS}_${ARCH}.tar.gz"
+BASE="https://github.com/ollygarden/ollygarden-cli/releases/download/${VERSION}"
+curl -fsSLO "${BASE}/${ASSET}" && curl -fsSLO "${BASE}/checksums.txt"
+grep "$ASSET" checksums.txt | shasum -a 256 -c -   # must print "OK"; on Linux use sha256sum -c -
+tar -xzf "$ASSET" ollygarden && install -m 0755 ollygarden ~/.local/bin/ollygarden
 ```
 
 ## 2. Auth & contexts
