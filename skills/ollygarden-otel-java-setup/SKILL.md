@@ -1,9 +1,35 @@
 ---
 name: ollygarden-otel-java-setup
-description: Ollygarden's recommended pattern for setting up OpenTelemetry in Java services. Covers the Javaagent vs Spring Boot Starter vs manual autoconfigure decision-making and the Maven BOM dependency pattern. Use when adding OTel to a Java project, choosing a setup path, or reviewing dependency declarations. Triggers on "java otel setup", "javaagent vs starter", "opentelemetry-bom".
+description: Ollygarden's recommended pattern for setting up OpenTelemetry in Java services. Covers the Javaagent vs Spring Boot Starter vs manual autoconfigure decision-making, the Maven BOM dependency pattern, and the setup checklist (query-parameter redaction). Use when adding OTel to a Java project, choosing a setup path, or reviewing dependency declarations. Triggers on "java otel setup", "javaagent vs starter", "opentelemetry-bom", "url.query redaction", "query parameter PII".
 ---
 
 # Java SDK Setup Conventions
+
+## Setup Checklist — verify every item before you finish
+
+Setup is not done when the SDK boots. Each unchecked item below produces a specific
+telemetry-quality finding in production; work through all of them.
+
+- [ ] **Redact user-identifiable query parameters from URL attributes.** HTTP server and
+  client instrumentation — Javaagent and Spring Boot Starter alike — capture the full query
+  string in `url.query` / `url.full`. The built-in redaction covers only credential
+  parameters (`AWSAccessKeyId`, `Signature`, `sig`, `X-Goog-Signature`); application
+  parameters carrying personal data are exported **verbatim** — think
+  `GET /owners?lastName=Smith` or any GET search form (Critical *PII Leakage* finding).
+  Enumerate every GET form and query parameter that can carry user data, then configure:
+
+  ```properties
+  # NOTE: full override, not additive — re-list the credential defaults too
+  otel.instrumentation.sanitization.url.experimental.sensitive-query-parameters=\
+    AWSAccessKeyId,Signature,sig,X-Goog-Signature,lastName,email,q
+  ```
+
+  (Declarative config: `general.sanitization.url.sensitive_query_parameters` under
+  `instrumentation/development`. Older 2.x releases only had the client-side
+  `otel.instrumentation.http.client.experimental.redact-query-parameters`, since removed —
+  there, or where no knob applies, scrub `url.query`/`url.full` in a `SpanProcessor` or at
+  the Collector.) Verify by sending a request with a known marker value in a query parameter
+  and inspecting the exported span: the attribute must show `REDACTED`, not the marker.
 
 ## Setup Decision Tree
 
