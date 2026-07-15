@@ -1,9 +1,50 @@
 ---
 name: ollygarden-otel-java-setup
-description: Ollygarden's recommended pattern for setting up OpenTelemetry in Java services. Covers the Javaagent vs Spring Boot Starter vs manual autoconfigure decision-making and the Maven BOM dependency pattern. Use when adding OTel to a Java project, choosing a setup path, or reviewing dependency declarations. Triggers on "java otel setup", "javaagent vs starter", "opentelemetry-bom".
+description: Ollygarden's recommended pattern for setting up OpenTelemetry in Java services. Covers the Javaagent vs Spring Boot Starter vs manual autoconfigure decision-making, the Maven BOM dependency pattern, and the setup checklist (no query strings in telemetry, startup DB span hygiene). Use when adding OTel to a Java project, choosing a setup path, or reviewing dependency declarations. Triggers on "java otel setup", "javaagent vs starter", "opentelemetry-bom", "url.query", "query parameter PII".
 ---
 
 # Java SDK Setup Conventions
+
+## Setup Checklist — verify every item before you finish
+
+Setup is not done when the SDK boots. Each unchecked item below produces a specific
+telemetry-quality finding in production; work through all of them.
+
+- [ ] **Do not export query strings.** Telemetry must not capture data that can carry
+  user input by default, and the query string is exactly that — yet Java HTTP
+  instrumentation (Javaagent and Spring Boot Starter alike) exports it out of the box:
+  `url.query` on server spans, inside `url.full` on client spans, with only four
+  credential parameters redacted. Anything else — `GET /owners?lastName=Smith`, search
+  terms, tokens in links — goes out verbatim (Critical *PII Leakage* finding). No property
+  turns the capture off (see the `otel-java` skill's
+  `references/sensitive-data-capture.md` for the mechanics), so strip it in
+  post-processing: overwrite `url.query`/`url.full` in a `SpanProcessor` (autoconfigure
+  SPI bean for the Starter, extension jar for the Javaagent), or delete/rewrite the
+  attributes in a Collector `transform`/`redaction` processor when every export path goes
+  through a Collector you control. The route template (`url.path`, `http.route`) already
+  answers "which endpoint"; if a specific parameter is genuinely needed as telemetry,
+  capture it deliberately as a bounded, named attribute — never by keeping the raw query
+  string. The same default-deny applies to the opt-in header and servlet-parameter capture
+  knobs: leave them off. Verify by sending a request with a known marker value in a query
+  parameter and inspecting the exported span: the marker must not appear anywhere.
+
+- [ ] **Keep startup database work from polluting trace shapes and span names.** Schema
+  init and migration statements run before any request exists, so JDBC instrumentation
+  emits them as parentless CLIENT **root** spans (*Root Client Span* finding). Worse, an
+  unnamed in-memory database bakes a per-boot identifier into every DB span name for the
+  process's whole lifetime: H2's default unnamed `mem:` URL yields names like
+  `INSERT 14a46930-c29a-4fbb-….owners` with a fresh UUID on each restart — unbounded
+  span-name cardinality. Two obligations:
+  1. Give in-memory/embedded databases a **stable name** (e.g.
+     `jdbc:h2:mem:appdb;DB_CLOSE_DELAY=-1`) so `db.namespace` — and with it every DB span
+     name — is bounded.
+  2. Decide startup-span policy explicitly: wrap initialization in an explicit
+     application-startup span where the framework allows, or drop init-phase DB spans (SDK
+     sampler or Collector rule) when they carry no operational value. Do not ship detached
+     DB roots by default.
+
+  Verify by booting the app and inspecting the first exported traces: no parentless CLIENT
+  roots, and no random per-boot identifiers anywhere in span names.
 
 ## Setup Decision Tree
 
