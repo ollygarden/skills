@@ -38,41 +38,48 @@ telemetry reports as `unknown_service` and cannot be grouped or owned.
 
 | Attribute | Source | How |
 |---|---|---|
-| `service.name` | author-time, stable | literal |
+| `service.name` | author-time, stable | `${OTEL_SERVICE_NAME:-<literal>}` — literal fallback, standard variable can override |
 | `service.namespace` | author-time, stable | literal |
 | `service.owner.url` | author-time, stable | literal — the service's repository URL |
-| `service.version` | build-time, varies | `${SERVICE_VERSION:-unknown}` |
-| `deployment.environment.name` | deploy-time, varies | `${DEPLOYMENT_ENVIRONMENT_NAME:-unknown}` |
+| `service.version` | build-time, varies | `OTEL_RESOURCE_ATTRIBUTES` via `attributes_list` |
+| `deployment.environment.name` | deploy-time, varies | `OTEL_RESOURCE_ATTRIBUTES` via `attributes_list` |
 
 ```yaml
 resource:
   attributes:
-    # Static — known at author time, identical across every deploy
+    # Static — known at author time; the standard variable still wins when set
     - name: service.name
-      value: "checkout-service"
+      value: "${OTEL_SERVICE_NAME:-checkout-service}"
     - name: service.namespace
       value: "payments"
     - name: service.owner.url
       value: "https://github.com/acme/checkout-service"
-    # Injected — varies per build / environment
-    - name: service.version
-      value: "${SERVICE_VERSION:-unknown}"
-    - name: deployment.environment.name
-      value: "${DEPLOYMENT_ENVIRONMENT_NAME:-unknown}"
+  # Deploy-varying attributes arrive through the STANDARD variable, e.g.
+  #   OTEL_RESOURCE_ATTRIBUTES=service.version=1.4.2,deployment.environment.name=production
+  attributes_list: ${OTEL_RESOURCE_ATTRIBUTES}
 ```
 
 **Rules:**
 
-- **Static values** (`service.name`, `service.namespace`, `service.owner.url`) are
-  hardcoded — they are stable per service. Do NOT route them through env vars; a missing
-  var silently degrades the value (e.g. to `unknown_service`).
-- **Injected values** (`service.version`, `deployment.environment.name`) use
-  `${VAR:-default}`. Declarative config cannot compute values — the env var must be
-  supplied at build/deploy time. Always include a `:-default` so the attribute is never empty.
-- **The env vars are a contract.** `SERVICE_VERSION` and `DEPLOYMENT_ENVIRONMENT_NAME`
-  must be wired into the runtime (CI build arg, container env, k8s manifest). That wiring
-  is the deployment layer's responsibility, not this config file's — but the config MUST
-  list which vars it expects.
+- **Static values** (`service.namespace`, `service.owner.url`, and the `service.name`
+  fallback) are hardcoded literals — they are stable per service and must never silently
+  degrade when a variable is missing.
+- **Deploy-varying values** (`service.version`, `deployment.environment.name`, ...) come
+  through the **standard** `OTEL_RESOURCE_ATTRIBUTES` variable into `attributes_list`. Do
+  NOT invent custom environment variables (`SERVICE_VERSION`,
+  `DEPLOYMENT_ENVIRONMENT_NAME`, ...) for values the standard variables already express —
+  the standard variable is the contract every OTel-aware deployment layer, operator, and
+  test harness already speaks. A declarative file ignores the environment unless it
+  references it, so omitting `attributes_list: ${OTEL_RESOURCE_ATTRIBUTES}` silently
+  breaks that contract.
+- **Precedence:** entries under `attributes` override `attributes_list`. Never duplicate
+  a deploy-varying key under `attributes` — a hardcoded
+  `deployment.environment.name: development` clobbers the operator's real environment and
+  misfiles every signal the service emits.
+- **The env vars are a contract.** `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, and
+  `OTEL_EXPORTER_OTLP_*` must be wired into the runtime (CI build arg, container env,
+  k8s manifest). That wiring is the deployment layer's responsibility, not this config
+  file's — but the config MUST reference the standard variables so they keep working.
 - **Do NOT hardcode `service.instance.id`.** Generate or inject a unique value per process when
   the selected SDK does not do so automatically. A shared literal makes every replica report
   the same id and corrupts per-instance metrics.
