@@ -1,6 +1,6 @@
 ---
 name: ollygarden-otel-java-setup
-description: Ollygarden's recommended pattern for setting up OpenTelemetry in Java services. Covers the Javaagent vs Spring Boot Starter vs manual autoconfigure decision-making, the Maven BOM dependency pattern, and the setup checklist (no query strings in telemetry, startup DB span hygiene). Use when adding OTel to a Java project, choosing a setup path, or reviewing dependency declarations. Triggers on "java otel setup", "javaagent vs starter", "opentelemetry-bom", "url.query", "query parameter PII".
+description: Ollygarden's recommended pattern for setting up OpenTelemetry in Java services. Covers the Javaagent vs Spring Boot Starter vs manual autoconfigure decision-making, the Maven BOM dependency pattern, and the setup checklist (no query strings in telemetry, startup DB span hygiene, declarative YAML config). Use when adding OTel to a Java project, choosing a setup path, or reviewing dependency declarations. Triggers on "java otel setup", "javaagent vs starter", "opentelemetry-bom", "url.query", "query parameter PII".
 ---
 
 # Java SDK Setup Conventions
@@ -45,6 +45,24 @@ telemetry-quality finding in production; work through all of them.
 
   Verify by booting the app and inspecting the first exported traces: no parentless CLIENT
   roots, and no random per-boot identifiers anywhere in span names.
+
+- [ ] **Configure the SDK declaratively — one YAML document, not property sprawl.** A
+  scatter of `otel.*` entries in `application.properties` or `-Dotel.*` flags is the
+  anti-pattern: operators cannot review or change the telemetry pipeline as a single
+  document without a rebuild. Use the declarative model for the chosen path (mechanics:
+  `otel-java` skill, `references/declarative-setup.md`; YAML conventions:
+  `ollygarden-otel-declarative-config`): Javaagent → standalone `otel.yaml` activated with
+  `-Dotel.config.file` / `OTEL_CONFIG_FILE`; Spring Boot Starter → the embedded model
+  opted in with `otel.file_format`; manual autoconfigure → the declarative-config
+  extension. **The file replaces property/env-based configuration** — standard `OTEL_*`
+  variables stop being honored unless the YAML references them, so keep that contract
+  working with substitution: `${OTEL_SERVICE_NAME:-<service>}` on `service.name`,
+  `attributes_list: ${OTEL_RESOURCE_ATTRIBUTES}` on the resource, and
+  `${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}` on the exporter (the upstream
+  migration template shows the full pattern). Verify both halves: boot with the standard
+  `OTEL_*` env vars set and confirm the values land on the exported resource and endpoint;
+  then change a config value (e.g. the sampler argument) and confirm behavior changes
+  without recompiling.
 
 ## Setup Decision Tree
 
