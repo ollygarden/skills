@@ -28,6 +28,16 @@ telemetry-quality finding in production; work through all of them.
   knobs: leave them off. Verify by sending a request with a known marker value in a query
   parameter and inspecting the exported span: the marker must not appear anywhere.
 
+  Adopting declarative YAML (third item below) changes none of this. The only declarative
+  surface is the same enumerate-and-redact parameter list this item rejects — and its leaf
+  key needs the experimental suffix
+  (`...sanitization.url.sensitive_query_parameters/development`; without the suffix the
+  node is **silently ignored**, because `instrumentation/development` content is not
+  schema-validated). No YAML node strips the query string. The `SpanProcessor` stays in
+  code, registered via the same SPI, and composes with the config file; do not delete it
+  when switching config styles. The marker-request check is the only proof — a YAML file
+  that parses and boots is not evidence the query string stopped flowing.
+
 - [ ] **Keep startup database work from polluting trace shapes and span names.** Schema
   init and migration statements run before any request exists, so JDBC instrumentation
   emits them as parentless CLIENT **root** spans (*Root Client Span* finding). Worse, an
@@ -54,10 +64,14 @@ telemetry-quality finding in production; work through all of them.
   `ollygarden-otel-declarative-config`): Javaagent → standalone `otel.yaml` activated with
   `-Dotel.config.file` / `OTEL_CONFIG_FILE`; Spring Boot Starter → the embedded model
   opted in with `otel.file_format`; manual autoconfigure → the declarative-config
-  extension. **The file replaces property/env-based configuration**, so it must preserve
-  the standard `OTEL_*` contract via substitution — the next checklist item spells that
-  out. Verify: change a config value (e.g. the sampler argument) and confirm behavior
-  changes without recompiling.
+  extension. **The file replaces property/env-based configuration — not code.** SDK
+  components registered through code (the query-string-stripping `SpanProcessor` from the
+  first item, startup-span policy from the second) stay in place and compose with the
+  file; going declarative does not discharge those items, and every earlier item's
+  verification must be re-run after the switch (marker request, startup trace
+  inspection). The file must also preserve the standard `OTEL_*` contract via
+  substitution — the next checklist item spells that out. Verify: change a config value
+  (e.g. the sampler argument) and confirm behavior changes without recompiling.
 
 - [ ] **Honor the standard `OTEL_*` environment variables end-to-end.**
   `OTEL_EXPORTER_OTLP_*`, `OTEL_SERVICE_NAME`, and `OTEL_RESOURCE_ATTRIBUTES` must all
