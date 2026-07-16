@@ -145,10 +145,16 @@ if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" = "Enforcing" ]; t
 - Off SELinux, leave the suffix empty (`SEL=""`); an unnecessary `:Z` is at best a no-op and at
   worst relabels a host path for nothing.
 
-### Stage 4 — Run the collector and generate the telemetry shape
+### Stage 4 — Confirm, then run the collector and generate the telemetry shape
 
 Work in a scratch directory with `harness.yaml` from Stage 2 in it — a throwaway copy you're
 willing to let `:Z` relabel (see Stage 3), never your only copy of a shared config.
+
+**Get explicit user confirmation before pulling or running remote container code.** Show the
+user the exact image reference, registry, tag, and digest below, explain that the runtime may
+download and execute it, and wait for an affirmative response. The original request to validate
+a config is not consent to pull or run the image. Do not execute any `pull` or `run` command if
+the user declines or has not responded.
 
 ```sh
 mkdir -p ./out
@@ -158,7 +164,7 @@ $RUNTIME run -d --rm --name otelcol-verify \
   --user "$(id -u):$(id -g)" \
   -v "$(pwd)/harness.yaml:/etc/otelcol-contrib/config.yaml:ro$SEL" \
   -v "$(pwd)/out:/output$SEL" \
-  otel/opentelemetry-collector-contrib:0.156.0 \
+  docker.io/otel/opentelemetry-collector-contrib:0.156.0@sha256:125bdbeb7590cc1952c5b3430ecf14063568980c2c93d5b38676cc0446ed8108 \
   --config=/etc/otelcol-contrib/config.yaml
 
 # wait until the collector reports ready, then feed it. Grepping the runtime's own
@@ -181,11 +187,13 @@ Two runtime caveats:
 - **`-p 127.0.0.1:4317:4317`** lets host-side `telemetrygen` reach `localhost:4317` without
   exposing the unauthenticated test receiver on external host interfaces. If loopback port
   publishing is unavailable, run telemetrygen as a second container on a private shared network.
-- **Pin a recent release tag** — `0.156.0` above is illustrative; use the current released
-  version so the component under test behaves as it will in production. Mind the tag formats:
-  the Docker Hub `otel/opentelemetry-collector-contrib` image is **unprefixed** (`:0.156.0`),
-  while the ghcr `telemetrygen` image is **`v`-prefixed** (`:v0.156.0`). See `otel-telemetrygen`
-  for the telemetrygen image.
+- **Pin the image by digest.** The example retains the `0.156.0` tag for readability but the
+  digest makes execution immutable. When updating the release, resolve its multi-platform
+  manifest digest from Docker Hub registry metadata and update the tag and digest together;
+  never execute a tag-only reference. Mind the tag formats: the Docker Hub
+  `otel/opentelemetry-collector-contrib` image is **unprefixed** (`:0.156.0`), while the ghcr
+  `telemetrygen` image is **`v`-prefixed** (`:v0.156.0`). See `otel-telemetrygen` for the
+  telemetrygen image.
 
 ### Stage 5 — Assert the output
 
