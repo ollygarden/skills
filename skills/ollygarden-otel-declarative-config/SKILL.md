@@ -188,7 +188,7 @@ tracer_provider:
 # BAD: secrets in version control
 headers:
   - name: api-key
-    value: "sk-1234567890abcdef"
+    value: "NOT_A_REAL_CREDENTIAL"
 ```
 
 ### Mixing env vars and config file
