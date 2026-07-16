@@ -5,6 +5,27 @@ description: Ollygarden's recommended patterns and anti-patterns for OpenTelemet
 
 # Declarative Configuration Conventions
 
+## The file replaces properties and env vars — not code
+
+Declarative YAML supersedes scattered `otel.*` properties, `-Dotel.*` flags, and
+SDK-setting `OTEL_*` variables. It does **not** supersede SDK components registered
+through code: `SpanProcessor`s (e.g. an attribute-stripping processor that removes
+`url.query`/`url.full`), custom samplers, and other SPI-registered components keep
+working alongside the file and stay where they are. When migrating a service to
+declarative config, inventory the code-registered components first — each one either
+has a schema-supported equivalent (move it) or it does not (keep the code); deleting one
+because "everything is YAML now" silently removes the guarantee it enforced.
+
+Two facts make this failure silent:
+
+- **Unrecognized keys under `instrumentation/development` are ignored, not rejected** —
+  that subtree is not schema-validated. A misspelled or invented node (including a missing
+  experimental `/development` key suffix) parses, boots, and does nothing.
+- **A config file that boots proves only that it parsed.** After the migration, re-run the
+  behavioral verification for every guarantee the old setup enforced (e.g. a
+  marker-value request to prove sensitive data still doesn't export) — never conclude
+  from the YAML's contents.
+
 ## Why declarative config is the default for new projects
 
 Prefer declarative YAML configuration over scattered `OTEL_*` environment variables and over
@@ -147,6 +168,25 @@ tracer_provider:
   availability and agent details, see the relevant `ollygarden-otel-*-setup` skill.
 
 ## Anti-Patterns
+
+### Replacing code-level guarantees with invented YAML nodes
+
+```yaml
+# BAD: written to replace a SpanProcessor that stripped url.query. The leaf key
+# is missing its experimental /development suffix, so the runtime silently
+# ignores it — and the processor it "replaced" is gone. The PII ships.
+instrumentation/development:
+  general:
+    sanitization:
+      url:
+        sensitive_query_parameters:
+          - lastName
+```
+
+The schema is not a superset of what code can do (see *The file replaces properties and
+env vars — not code*). Before expressing a guarantee in YAML, confirm the exact node in
+the selected runtime's schema/source; keep the code component unless a supported
+equivalent exists; and re-verify the guarantee behaviorally after the switch.
 
 ### Missing `parent_based` wrapper
 
