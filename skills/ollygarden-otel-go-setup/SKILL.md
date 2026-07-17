@@ -71,10 +71,16 @@ telemetry-quality finding in production; work through all of them.
 ## Required: Verification Report
 
 Setup is not complete until you produce this report. It is a table with one row per
-checklist item above. Each row records what you actually did and what you observed —
-concrete artifacts from THIS run: the marker value you sent, an excerpt of the exported
-span dump, a trace id, the config value you changed. Never a restatement of the
-requirement, never a bare "done".
+checklist item above. Fill each row with artifacts from THIS run — the marker value you
+sent, an excerpt of the exported span dump, a trace id, the config value you changed.
+Never a restatement of the requirement, never a bare "done".
+
+The table below is an **illustrative example, not a report you can submit**: every value in
+it is a placeholder showing the expected *shape* of evidence. Replace every cell with your
+own run's artifacts. If you did not run a check, write `GAP — not run` in that row and
+leave it visible — a missing or hand-waved row is itself a finding.
+
+Example (illustrative values — replace every cell with your own run's evidence):
 
 | Item | Check performed | Observed evidence |
 | -- | -- | -- |
@@ -83,10 +89,11 @@ requirement, never a bare "done".
 | SDK configured declaratively | changed a value in `configs/otel.yaml` (e.g. the sampler ratio) and restarted without recompiling; renamed the file to confirm fallback | new sampling behavior took effect from the file alone; with the file absent the app logged the no-op warning and still ran |
 | `service.instance.id` injected | dumped the exported resource across two process starts | `service.instance.id` present as a UUID, and it differs between the two boots |
 | Resource kept lean | dumped the exported resource attributes | exactly `service.name`, `service.version`, `service.instance.id`, `deployment.environment.name`; no `os.*` or `process.*` keys |
-| Standard `OTEL_*` honored | booted with `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, and `OTEL_EXPORTER_OTLP_ENDPOINT` all set to non-default values | each value lands on the exported telemetry; no code-level default overwrote `deployment.environment.name` |
+| Standard `OTEL_*` honored | booted with `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` set to non-defaults, and `OTEL_EXPORTER_OTLP_ENDPOINT` pointed at a marker collector | `service.name`/`deployment.environment.name` carry the supplied values on exported telemetry, with no code-level default overwriting them; the marker collector's log / receipt confirms telemetry arrived at the overridden endpoint (the endpoint is a destination, evidenced there, not on the spans) |
 
 A row you cannot fill with observed evidence is a visible gap — that item is not done.
-Do not delete the row or write "N/A" to hide it; go run the check and record what you saw.
+Do not delete the row, copy these example values, or write "N/A" to hide it; go run the
+check and record what you actually saw.
 
 ## Recommended import path
 
