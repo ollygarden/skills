@@ -114,21 +114,28 @@ telemetry-quality finding in production; work through all of them.
 ## Required: Verification Report
 
 Setup is not complete until you produce this report. It is a table with one row per
-checklist item above. Each row records what you actually did and what you observed —
-concrete artifacts from THIS run: the marker value you sent, an excerpt of the exported
-span dump, a trace id, the config value you changed. Never a restatement of the
-requirement, never a bare "done".
+checklist item above. Fill each row with artifacts from THIS run — the marker value you
+sent, an excerpt of the exported span dump, a trace id, the config value you changed.
+Never a restatement of the requirement, never a bare "done".
+
+The table below is an **illustrative example, not a report you can submit**: every value in
+it is a placeholder showing the expected *shape* of evidence. Replace every cell with your
+own run's artifacts. If you did not run a check, write `GAP — not run` in that row and
+leave it visible — a missing or hand-waved row is itself a finding.
+
+Example (illustrative values — replace every cell with your own run's evidence):
 
 | Item | Check performed | Observed evidence |
 | -- | -- | -- |
-| No query strings exported | `GET /owners?lastName=MARKER_7f3a` → inspected exported span | `url.query` absent; `MARKER_7f3a` nowhere in span dump (trace `4bf9...`) |
+| No query strings exported | `GET /owners?lastName=MARKER_7f3a` → inspected exported span (check which semconv mode: `url.query`/`url.full` vs legacy `http.target`/`http.url`) | query attribute absent; `MARKER_7f3a` nowhere in span dump (trace `4bf9...`) |
 | Startup / non-request span hygiene | Booted app, inspected first exported traces | No parentless CLIENT roots; startup DB call is child of `app.startup` span; no ids in span names |
 | SDK configured declaratively | Changed sampler arg in `configs/otel.yaml`, restarted without rebuild | Sampling ratio changed on exported spans; no code edit needed |
-| Standard `OTEL_*` honored | Booted with `OTEL_SERVICE_NAME`/`OTEL_RESOURCE_ATTRIBUTES`/`OTEL_EXPORTER_OTLP_ENDPOINT` set to non-defaults | All three reflected on exported resource / export target |
+| Standard `OTEL_*` honored | Booted with `OTEL_SERVICE_NAME`/`OTEL_RESOURCE_ATTRIBUTES` set to non-defaults, and `OTEL_EXPORTER_OTLP_ENDPOINT` pointed at a marker collector | `service.name`/`deployment.environment.name` carry the supplied values on the exported resource; the marker collector's log / receipt confirms telemetry arrived at the overridden endpoint (the endpoint is a destination, evidenced there, not on the spans) |
 | Lean resource + `service.instance.id` | Dumped resource from two separate process starts | `service.instance.id` present and differs across starts; no `process.*`/`os.*` attrs |
 
 A row you cannot fill with observed evidence is a visible gap — that item is not done.
-Do not delete the row or write "N/A" to hide it; go run the check and record what you saw.
+Do not delete the row, copy these example values, or write "N/A" to hide it; go run the
+check and record what you actually saw.
 
 ## Dependencies
 
