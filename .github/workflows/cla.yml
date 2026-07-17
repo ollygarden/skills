@@ -22,5 +22,5 @@ jobs:
       contents: write
       pull-requests: write
       statuses: write
-    # Pinned to the immutable squash-merge SHA of ollygarden/.github#6.
-    uses: ollygarden/.github/.github/workflows/cla.yml@f9fba8552bebbf8b9c01d20d6cfd30041065b4aa
+    # Pinned to the immutable squash-merge SHA of ollygarden/.github#8.
+    uses: ollygarden/.github/.github/workflows/cla.yml@57a9e9f54c6e3970fc5d9e722b20efab0aa47397
