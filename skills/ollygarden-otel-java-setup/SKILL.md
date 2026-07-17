@@ -17,11 +17,13 @@ telemetry-quality finding in production; work through all of them.
   credential parameters redacted. Anything else — `GET /owners?lastName=Smith`, search
   terms, tokens in links — goes out verbatim (Critical *PII Leakage* finding). No property
   turns the capture off (see the `otel-java` skill's
-  `references/sensitive-data-capture.md` for the mechanics), so strip it in
-  post-processing: overwrite `url.query`/`url.full` in a `SpanProcessor` (autoconfigure
-  SPI bean for the Starter, extension jar for the Javaagent), or delete/rewrite the
-  attributes in a Collector `transform`/`redaction` processor when every export path goes
-  through a Collector you control. The route template (`url.path`, `http.route`) already
+  `references/sensitive-data-capture.md` for the mechanics), so strip it **in-process,
+  before it leaves the JVM**: overwrite `url.query`/`url.full` in a `SpanProcessor`
+  (autoconfigure SPI bean for the Starter, extension jar for the Javaagent). A Collector
+  `transform`/`redaction` processor is only defense-in-depth, never the sole control — by
+  the time telemetry reaches the Collector the raw value has already crossed the process
+  boundary and may sit in in-transit buffers, debug logs, or an alternate export path that
+  skips the Collector. The route template (`url.path`, `http.route`) already
   answers "which endpoint"; if a specific parameter is genuinely needed as telemetry,
   capture it deliberately as a bounded, named attribute — never by keeping the raw query
   string. The same default-deny applies to the opt-in header and servlet-parameter capture
@@ -95,8 +97,10 @@ telemetry-quality finding in production; work through all of them.
   deploy-varying key (e.g. `deployment.environment.name`) under `attributes`, or the
   hardcoded value silently wins and misfiles every signal. Point the exporter at
   `${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}`. Verify by booting with all
-  three standard variables set to non-default values and confirming each lands on the
-  exported telemetry.
+  three standard variables set to non-default values: `OTEL_SERVICE_NAME` and
+  `OTEL_RESOURCE_ATTRIBUTES` must land on the exported resource, while the overridden
+  `OTEL_EXPORTER_OTLP_ENDPOINT` — a destination, not a telemetry attribute — is confirmed at
+  the receiving collector, not on the spans.
 
 ## Required: Verification Report
 
