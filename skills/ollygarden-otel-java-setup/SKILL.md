@@ -98,6 +98,24 @@ telemetry-quality finding in production; work through all of them.
   three standard variables set to non-default values and confirming each lands on the
   exported telemetry.
 
+## Required: Verification Report
+
+Setup is not complete until you produce this report. It is a table with one row per
+checklist item above. Each row records what you actually did and what you observed —
+concrete artifacts from THIS run: the marker value you sent, an excerpt of the exported
+span dump, a trace id, the config value you changed. Never a restatement of the
+requirement, never a bare "done".
+
+| Item | Check performed | Observed evidence |
+| -- | -- | -- |
+| No query strings exported | `GET /owners?lastName=MARKER_7f3a` → inspected exported server + client spans | `url.query` absent; `url.full` = `http://host/owners`; `MARKER_7f3a` nowhere in the span dump (trace `4bf92f35...`) |
+| Startup DB span hygiene | booted app, inspected first exported traces | no parentless CLIENT roots; span names bounded (`INSERT appdb.owners`, no per-boot UUID) |
+| Declarative config | changed the sampler argument in `otel.yaml`, restarted without rebuild | sampled ratio changed as expected; no recompile |
+| Standard `OTEL_*` honored | booted with `OTEL_SERVICE_NAME`/`OTEL_RESOURCE_ATTRIBUTES`/`OTEL_EXPORTER_OTLP_ENDPOINT` set to non-defaults | each value present on exported telemetry (`service.name=…`, `deployment.environment.name=…`) |
+
+A row you cannot fill with observed evidence is a visible gap — that item is not done.
+Do not delete the row or write "N/A" to hide it; go run the check and record what you saw.
+
 ## Setup Decision Tree
 
 ```
