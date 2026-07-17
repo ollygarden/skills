@@ -98,6 +98,31 @@ telemetry-quality finding in production; work through all of them.
   three standard variables set to non-default values and confirming each lands on the
   exported telemetry.
 
+## Required: Verification Report
+
+Setup is not complete until you produce this report. It is a table with one row per
+checklist item above. Fill each row with artifacts from THIS run — the marker value you
+sent, an excerpt of the exported span dump, a trace id, the config value you changed.
+Never a restatement of the requirement, never a bare "done".
+
+The table below is an **illustrative example, not a report you can submit**: every value in
+it is a placeholder showing the expected *shape* of evidence. Replace every cell with your
+own run's artifacts. If you did not run a check, write `GAP — not run` in that row and
+leave it visible — a missing or hand-waved row is itself a finding.
+
+Example (illustrative values — replace every cell with your own run's evidence):
+
+| Item | Check performed | Observed evidence |
+| -- | -- | -- |
+| No query strings exported | `GET /owners?lastName=MARKER_7f3a` → inspected exported server + client spans | `url.query` absent; `url.full` = `http://host/owners`; `MARKER_7f3a` nowhere in the span dump (trace `4bf92f35...`) |
+| Startup DB span hygiene | booted app, inspected first exported traces | no parentless CLIENT roots; span names bounded (`INSERT appdb.owners`, no per-boot UUID) |
+| Declarative config | changed the sampler argument in `otel.yaml`, restarted without rebuild | sampled ratio changed as expected; no recompile |
+| Standard `OTEL_*` honored | booted with `OTEL_SERVICE_NAME`/`OTEL_RESOURCE_ATTRIBUTES` set to non-defaults, and `OTEL_EXPORTER_OTLP_ENDPOINT` pointed at a marker collector | `service.name`/`deployment.environment.name` carry the supplied values on exported spans; the marker collector's startup log / receipt confirms telemetry arrived at the overridden endpoint (the endpoint is a destination, so it is evidenced there, not on the spans) |
+
+A row you cannot fill with observed evidence is a visible gap — that item is not done.
+Do not delete the row, copy these example values, or write "N/A" to hide it; go run the
+check and record what you actually saw.
+
 ## Setup Decision Tree
 
 ```
