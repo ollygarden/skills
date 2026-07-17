@@ -68,6 +68,26 @@ telemetry-quality finding in production; work through all of them.
   `deployment.environment.name = "development"` silently clobbers the deployment's real
   environment and misfiles every signal the service emits.
 
+## Required: Verification Report
+
+Setup is not complete until you produce this report. It is a table with one row per
+checklist item above. Each row records what you actually did and what you observed —
+concrete artifacts from THIS run: the marker value you sent, an excerpt of the exported
+span dump, a trace id, the config value you changed. Never a restatement of the
+requirement, never a bare "done".
+
+| Item | Check performed | Observed evidence |
+| -- | -- | -- |
+| Context threaded to data layer | traced a request end-to-end and inspected the exported spans | DB span is a CHILD of the HTTP server span (same trace id `4bf9…`), no parentless CLIENT-kind roots |
+| No SQL parameter values on any signal | ran a query with marker value `MARKER_7f3a`, inspected the exported DB span, SQL logs, and DB metrics | `db.query.text` shows only `?` placeholders; `MARKER_7f3a` appears in no span, log, or metric |
+| SDK configured declaratively | changed a value in `configs/otel.yaml` (e.g. the sampler ratio) and restarted without recompiling; renamed the file to confirm fallback | new sampling behavior took effect from the file alone; with the file absent the app logged the no-op warning and still ran |
+| `service.instance.id` injected | dumped the exported resource across two process starts | `service.instance.id` present as a UUID, and it differs between the two boots |
+| Resource kept lean | dumped the exported resource attributes | exactly `service.name`, `service.version`, `service.instance.id`, `deployment.environment.name`; no `os.*` or `process.*` keys |
+| Standard `OTEL_*` honored | booted with `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, and `OTEL_EXPORTER_OTLP_ENDPOINT` all set to non-default values | each value lands on the exported telemetry; no code-level default overwrote `deployment.environment.name` |
+
+A row you cannot fill with observed evidence is a visible gap — that item is not done.
+Do not delete the row or write "N/A" to hide it; go run the check and record what you saw.
+
 ## Recommended import path
 
 For new code, use the root `otelconf` package (`go.opentelemetry.io/contrib/otelconf`) — it
