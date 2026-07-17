@@ -26,13 +26,15 @@ telemetry-quality finding in production; work through all of them.
   on server spans and inside `http.url` on client spans; redacting only the stable
   `url.query`/`url.full` keys then leaves the marker exposed. Only userinfo credentials are
   redacted by default; everything else — `GET /owners?lastName=Smith`, search terms, tokens
-  pasted into links — goes out verbatim (Critical *PII Leakage* finding). Strip it before it
-  leaves the process: overwrite or delete whichever attributes carry it in your mode
-  (`url.query`/`url.full`, and/or `http.target`/`http.url`) either in the
-  HTTP instrumentation's own attribute hook (`applyCustomAttributesOnSpan` /
-  `startIncomingSpanHook`), or in a span-processor / exporter wrapper that rewrites the
-  attribute before export, or in a Collector `transform`/`redaction` processor when every
-  export path goes through a Collector you control. The route template (`http.route`,
+  pasted into links — goes out verbatim (Critical *PII Leakage* finding). Strip it
+  **in-process, before it leaves the application** — overwrite or delete whichever attributes
+  carry it in your mode (`url.query`/`url.full`, and/or `http.target`/`http.url`) in the HTTP
+  instrumentation's own attribute hook (`applyCustomAttributesOnSpan` /
+  `startIncomingSpanHook`) or in a span-processor / exporter wrapper that rewrites the
+  attribute before export. A Collector `transform`/`redaction` processor is only
+  defense-in-depth, never the sole control: the raw value has already crossed the process
+  boundary and may sit in in-transit buffers, debug logs, or an alternate export path that
+  skips the Collector. The route template (`http.route`,
   `url.path`) already answers "which endpoint"; if a specific parameter is genuinely needed as
   telemetry, capture it deliberately as a bounded, named attribute — never by keeping the raw
   query string. Leave the opt-in header-capture knobs
@@ -95,11 +97,15 @@ telemetry-quality finding in production; work through all of them.
   Do not also hardcode a deploy-varying key (e.g. `deployment.environment.name`) under
   `attributes`, or the literal silently wins and misfiles every signal. Point the exporter at
   `${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}`. Verify by booting with all three
-  standard variables set to non-default values and confirming each lands on the exported
-  telemetry.
+  standard variables set to non-default values: `OTEL_SERVICE_NAME` and
+  `OTEL_RESOURCE_ATTRIBUTES` must land on the exported resource, while the overridden
+  `OTEL_EXPORTER_OTLP_ENDPOINT` — a destination, not a telemetry attribute — is confirmed at
+  the receiving collector, not on the spans.
 
-- [ ] **Keep the resource lean and add `service.instance.id`.** The Node SDK does not generate
-  `service.instance.id`, and without it every process of a replicated service is
+- [ ] **Keep the resource lean and add `service.instance.id`.** The Node SDK's default
+  detector set (`envDetector`, `processDetector`, `hostDetector`) does **not** include
+  `service.instance.id` — the `serviceinstance` detector that would mint one is experimental
+  and off by default — so unless you act, every process of a replicated service is
   indistinguishable (*Missing service.instance.id* finding). Add a per-process UUID
   (`crypto.randomUUID()`) alongside `service.version`: programmatically via
   `resourceFromAttributes` (the string key is `service.instance.id`, or `ATTR_SERVICE_INSTANCE_ID`
@@ -214,16 +220,23 @@ import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 import { BatchLogRecordProcessor } from '@opentelemetry/sdk-logs';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { resourceFromAttributes } from '@opentelemetry/resources';
-import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
+import { resourceFromAttributes, envDetector } from '@opentelemetry/resources';
+import { ATTR_SERVICE_INSTANCE_ID } from '@opentelemetry/semantic-conventions/incubating';
+import { randomUUID } from 'node:crypto';
 
+// service.name / service.version / deployment.environment.name arrive through the standard
+// OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES variables (applied by envDetector below);
+// do not invent custom vars for them. Mint only the per-process service.instance.id that no
+// default detector provides.
 const resource = resourceFromAttributes({
-  [ATTR_SERVICE_NAME]: 'my-service',
-  [ATTR_SERVICE_VERSION]: process.env.SERVICE_VERSION ?? '0.0.0',
+  [ATTR_SERVICE_INSTANCE_ID]: randomUUID(),
 });
 
 export const sdk = new NodeSDK({
   resource,
+  // Only envDetector: honor the OTEL_* contract without stamping discouraged
+  // process.* / os.* attributes from the default process/host detectors.
+  resourceDetectors: [envDetector],
   traceExporter: new OTLPTraceExporter(),
   metricReader: new PeriodicExportingMetricReader({
     exporter: new OTLPMetricExporter(),
