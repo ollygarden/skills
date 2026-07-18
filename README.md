@@ -39,7 +39,6 @@ Every skill is a top-level directory under `skills/` whose name matches the skil
 skills/
 ├── ollygarden-cli/
 ├── ollygarden-insight-remediation/
-├── ollygarden-otel-auto-instrumentation/
 ├── ollygarden-otel-declarative-config/
 ├── ollygarden-otel-instrumentation-planning/
 ├── ollygarden-otel-manual-instrumentation/
@@ -60,7 +59,6 @@ All skill `name:` fields carry an `ollygarden-` prefix to declare ownership in t
 |-------|-------------|
 | [`ollygarden-cli`](skills/ollygarden-cli/) | Use the `ollygarden` CLI to query services, insights, analytics, organizations, and manage webhooks from the terminal. |
 | [`ollygarden-insight-remediation`](skills/ollygarden-insight-remediation/) | Fetch active service insights from the Olive API and apply remediation fixes to the current codebase. |
-| [`ollygarden-otel-auto-instrumentation`](skills/ollygarden-otel-auto-instrumentation/) | Plan and review auto-instrumentation scope, tuning, suppressions, sampling, sensitive-data risks, and when to add manual context without duplicate spans. |
 | [`ollygarden-otel-declarative-config`](skills/ollygarden-otel-declarative-config/) | OllyGarden's declarative-first OpenTelemetry conventions: when to use YAML config, anti-patterns, common patterns. |
 | [`ollygarden-otel-instrumentation-planning`](skills/ollygarden-otel-instrumentation-planning/) | Plan Minimal Viable Instrumentation for a codebase: identify boundaries, classify them as auto vs manual, choose signals, plan attributes with cardinality awareness. |
 | [`ollygarden-otel-manual-instrumentation`](skills/ollygarden-otel-manual-instrumentation/) | OllyGarden's manual instrumentation rules: choose runtime boundaries and signals, apply semantic conventions, handle propagation, control cardinality, verify the result. |
