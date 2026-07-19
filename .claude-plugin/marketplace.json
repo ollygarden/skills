@@ -17,6 +17,10 @@
       "source": "./skills/ollygarden-insight-remediation"
     },
     {
+      "name": "ollygarden-otel-auto-instrumentation",
+      "source": "./skills/ollygarden-otel-auto-instrumentation"
+    },
+    {
       "name": "ollygarden-otel-declarative-config",
       "source": "./skills/ollygarden-otel-declarative-config"
     },
