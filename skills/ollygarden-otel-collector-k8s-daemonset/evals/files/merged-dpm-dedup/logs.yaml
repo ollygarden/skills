@@ -2,6 +2,7 @@ receivers:
   filelog:
     include: [/var/log/pods/*/*/*.log]
     include_file_path: true
+    include_file_record_number: true
     include_file_name: true
 
 processors:
