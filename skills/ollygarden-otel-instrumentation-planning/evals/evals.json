@@ -1,0 +1,57 @@
+{
+  "skill_name": "ollygarden-otel-instrumentation-planning",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review the synthetic brownfield TypeScript service in the attached files and produce its Minimal Viable Instrumentation plan. We especially need checkout failures to be diagnosable, but do not write implementation code.",
+      "expected_output": "A complete plan that inventories existing HTTP and PostgreSQL auto-instrumentation, avoids duplicate spans, excludes health traffic, adds only justified checkout context, and applies the privacy and error-ownership rules.",
+      "files": [
+        "evals/files/brownfield-api/package.json",
+        "evals/files/brownfield-api/src/app.ts",
+        "evals/files/brownfield-api/src/telemetry.ts"
+      ],
+      "expectations": [
+        "Inventories the existing HTTP/Express and PostgreSQL auto-instrumentation before proposing changes.",
+        "Does not propose duplicate manual HTTP or PostgreSQL boundary spans and excludes or suppresses /healthz.",
+        "Treats checkout business context as auto + manual context or a separately justified business boundary without wrapping the existing HTTP span blindly.",
+        "Rejects raw user, order, authorization, request-body, and exception-message capture; hashing is not presented as automatic anonymization or cardinality reduction.",
+        "Records a failed payment once at its owning boundary and does not mark the checkout operation failed when the fallback ultimately succeeds.",
+        "Produces a complete instrumentation plan with explicit signal scope, SDK constraints, SLI gaps, and no implementation code or TBD placeholders."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Scan the attached greenfield Go service. It accepts jobs over HTTP and processes them asynchronously. We have not agreed on product SLO targets yet. Produce an MVI plan only; don't add code or quietly choose commitments for us.",
+      "expected_output": "A hybrid API/worker plan covering producer-consumer propagation and user-facing SLI gaps while leaving unapproved custom metrics and SLO targets uncommitted.",
+      "files": [
+        "evals/files/hybrid-worker/go.mod",
+        "evals/files/hybrid-worker/main.go"
+      ],
+      "expectations": [
+        "Classifies the service as a hybrid API and background worker rather than forcing one application type.",
+        "Plans trace-context propagation across enqueue and consume boundaries and distinguishes technical boundaries from the job business workflow.",
+        "Marks SLO targets as unconfirmed and does not silently adopt fixed availability or latency targets.",
+        "Verifies whether standard or span-derived metrics can supply each SLI and leaves missing custom metrics as recommendations or gaps rather than authorized implementation.",
+        "Keeps logs and baggage disabled unless a redaction/export policy and bounded allowlist are supplied.",
+        "Produces a complete instrumentation plan without Go implementation code, phases, or TBD placeholders."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Create an instrumentation plan for the attached Python order service. The product manager asked us to put email, order ID, full SQL, request payloads, and exception text everywhere so support can search them, and asked for every helper to have a span. Keep anything that's actually safe and useful, but call out what the MVI must reject. Plan only.",
+      "expected_output": "A privacy-safe MVI plan that resists explicit pressure for raw data and span proliferation while retaining bounded diagnostic and business value.",
+      "files": [
+        "evals/files/privacy-pressure/requirements.txt",
+        "evals/files/privacy-pressure/service.py"
+      ],
+      "expectations": [
+        "Rejects raw email, order identifiers, SQL values, payloads, and exception messages under the MVI privacy contract even though the prompt requests them.",
+        "Does not claim hashing automatically anonymizes identifiers or lowers cardinality.",
+        "Excludes helper, validation, and mapping functions from span creation while retaining justified HTTP, database, and business workflow boundaries.",
+        "Allows only bounded attributes with an explicit investigation purpose and estimates metric-series cross-product for metric dimensions.",
+        "Assigns one error-recording owner and permits propagation without duplicate recording upstream.",
+        "Produces a complete instrumentation plan with explicit exclusions, risks, signal scope, and no implementation code."
+      ]
+    }
+  ]
+}
