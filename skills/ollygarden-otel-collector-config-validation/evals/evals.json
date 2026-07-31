@@ -1,0 +1,47 @@
+{
+  "skill_name": "ollygarden-otel-collector-config-validation",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review the attached production Collector fragment and design a behavioral validation plan for its filter processor. Do not run containers or change the production file. We need proof that only health spans are dropped.",
+      "expected_output": "A read-only OTLP-in/file-out harness plan that copies the filter verbatim and tests both a matching health span and a non-matching application span.",
+      "files": ["evals/files/filter-processor/production.yaml"],
+      "expectations": [
+        "Treats static validation as necessary but insufficient and does not claim that a successful parse proves filter behavior.",
+        "Uses an OTLP receiver bound to 0.0.0.0:4317 and a file exporter in an isolated harness rather than testing the production receiver or exporter.",
+        "Copies the filter/health component under test verbatim, with any input-shaping transform clearly separate from it.",
+        "Plans one matching /healthz input that must be absent and one non-matching application input that must be present.",
+        "Stops or flushes the collector before inspecting output and distinguishes an empty output from a collector that failed to receive data.",
+        "Does not run or authorize a container pull, container execution, or production-file mutation."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Design an end-to-end test for the routing connector in the attached config. Prove checkout traffic, ordinary traffic, and unmatched traffic land correctly. Give the harness and assertions, but don't execute anything.",
+      "expected_output": "A connector-aware two-sided harness with separate outputs for each destination and explicit default-route presence and cross-route absence assertions.",
+      "files": ["evals/files/routing-connector/production.yaml"],
+      "expectations": [
+        "Wires routing/tenant as an exporter in the source pipeline and a receiver in every destination pipeline.",
+        "Uses distinct file exporters and output paths for checkout, ordinary, and default destinations.",
+        "Includes an input for each explicit route plus an unmatched input for default_pipelines.",
+        "Asserts each input is present in exactly its expected output and absent from every other route output.",
+        "Keeps the connector component under test unchanged and isolates any synthetic input shaping outside it.",
+        "Does not reduce the test to static validation or a single assertion that some output exists."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Prepare the exact local execution plan for validating the attached transform. I have not approved any image pull or container run yet. Fedora with SELinux enforcing is possible, and the test must not expose OTLP beyond localhost. Stop before execution and tell me exactly what approval is still needed.",
+      "expected_output": "A safe preflight and approval request naming an immutable image, scratch-only SELinux mounts, loopback publication, and the post-run assertion without executing remote code.",
+      "files": ["evals/files/execution-gate/production.yaml"],
+      "expectations": [
+        "Stops before any pull or run and asks for fresh explicit approval after showing the exact registry, image, tag, and digest.",
+        "States that the image may be downloaded and remote container code executed and does not treat the original validation request as consent.",
+        "Uses a throwaway config copy and fresh output directory rather than relabeling a shared path, home directory, or sole production copy.",
+        "Uses private SELinux :Z relabeling only for those scratch mounts and explains the host-label mutation risk.",
+        "Publishes OTLP on 127.0.0.1 only and keeps the in-container receiver reachable on 0.0.0.0.",
+        "Plans to run as the host UID where appropriate, accounts for rootless Podman, flushes output, and asserts the transformed field value."
+      ]
+    }
+  ]
+}

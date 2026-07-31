@@ -1,0 +1,7 @@
+processors:
+  transform/redact:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - set(attributes["validation.marker"], "redacted") where attributes["validation.marker"] != nil
