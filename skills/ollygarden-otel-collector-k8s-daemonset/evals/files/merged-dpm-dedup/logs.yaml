@@ -1,0 +1,16 @@
+receivers:
+  filelog:
+    include: [/var/log/pods/*/*/*.log]
+    include_file_path: true
+    include_file_name: true
+
+processors:
+  logdedup:
+    interval: 10s
+
+service:
+  pipelines:
+    logs:
+      receivers: [filelog]
+      processors: [memory_limiter, logdedup, batch]
+      exporters: [otlp]

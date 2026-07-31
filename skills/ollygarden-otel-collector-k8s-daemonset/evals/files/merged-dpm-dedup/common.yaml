@@ -1,0 +1,8 @@
+processors:
+  memory_limiter:
+    limit_mib: 256
+  batch: {}
+
+exporters:
+  otlp:
+    endpoint: ${env:OTLP_EXPORTER_ENDPOINT}

@@ -6,228 +6,114 @@ license: Apache-2.0
 
 # Opinionated OTel Collector — Kubernetes DaemonSet
 
-This skill is OllyGarden's opinion about how a **node-agent collector** (one collector pod
-per node, deployed as a DaemonSet) should be configured so that the telemetry leaving the
-node is already lean. It layers opinions on top of upstream facts:
+Use this skill for the **agent tier**: one collector per node ingesting node-local OTLP,
+kubelet/host metrics, same-node Prometheus targets, and pod logs. Use a separate gateway or
+cluster Deployment for `tail_sampling`, `load_balancing`, `k8s_cluster`, and `k8s_events`.
 
-- For component config keys, defaults, stability, and renames → the **`otel-collector`** skill.
-- For OTTL statement/condition syntax → the **`otel-ottl`** skill.
-- For source-side fixes that the collector cannot do → the `ollygarden-otel-*` setup skills.
+This repository owns OllyGarden's decisions, not component facts. Consult `otel-collector` for
+current component keys, defaults, and stability; `otel-ottl` for syntax; and the relevant
+`ollygarden-otel-*` setup skill for source-side fixes.
 
-The companion reference config is **decomposed by signal pipeline** under
-[`references/`](references/): a shared [`common.yaml`](references/common.yaml) plus
-[`traces.yaml`](references/traces.yaml), [`metrics.yaml`](references/metrics.yaml), and
-[`logs.yaml`](references/logs.yaml), with the Prometheus scrape jobs pulled in from
-[`references/prometheus/`](references/prometheus/). Read them alongside this file; the prose
-explains *why*, the YAML shows *how*. Copy the set, then search for `CUSTOMIZE`. See
-[Decomposing this config](#decomposing-this-config) for how the files merge and how to validate
-them together.
+## Non-negotiable pipeline contract
 
-## When this skill applies
+Apply these to traces, metrics, and logs:
 
-Use it for the **agent tier**: a DaemonSet collector that ingests OTLP from workloads on its
-node and scrapes node-local sources (kubelet, host, same-node pods, pod log files). It does
-**not** cover the **gateway/cluster tier** — a separate Deployment (often a singleton) that
-runs `k8s_cluster`/`k8s_events`, tail sampling, and load balancing. Two things that belong
-there, not here, are called out in the [Out of scope](#out-of-scope) section.
+1. Put `memory_limiter` first so backpressure happens before downstream buffering.
+2. Enrich with real identity; do not fabricate it. Scope `k8sattributes` to the local node with
+   `filter.node_from_env_var: K8S_NODE_NAME`, disable the system detector's `host.name`, and verify
+   detector order/`override` against the pinned Collector distribution.
+3. Put resource-value truncation last among transforms. Kubernetes metadata can otherwise inflate
+   every record.
+4. Persist `filelog` offsets with `file_storage` on host-backed storage. Container-local storage
+   loses offsets when the pod is recreated.
 
-## The core principle: drop early, drop at the node
+The OTLP listener binding alone does not make ingest node-local. The DaemonSet deployment must
+route each workload to the agent on its own node. Confirm the networking topology before claiming
+the agent/gateway boundary holds.
 
-Every byte you discard at the node is a byte you never pay to batch, compress, transmit,
-re-ingest, or store. The node agent is the **first** place you control the data and the
-**cheapest** place to shrink it, so the agent config is where volume/cost/cardinality work
-belongs. The rest of this skill is that principle applied signal by signal.
+## Metrics: reduce series and cadence
 
-## Non-negotiables (every pipeline, every signal)
+Metric cost is series count × datapoints per minute. The references implement these decisions:
 
-These four are not tuning knobs — they are the baseline. Omitting any of them is a bug.
+- Curate `kubeletstats` and `hostmetrics`; prefer bounded utilization measurements over redundant
+  per-state series.
+- Split fast and slow groups into disjoint receiver instances. Keep container/pod/node metrics at
+  20s, volume metrics at 60s, CPU/memory at 60s, and filesystem at 300s. Do not slow a single
+  receiver globally and lose useful CPU/memory resolution.
+- Drop read-only `secret`, `configMap`, `downwardAPI`, and projected service-account-token volume
+  metrics. Retain `emptyDir`: its writable usage is a disk-pressure signal.
+- Scrape each pod only from the agent on its node using
+  `field: spec.nodeName=${env:K8S_NODE_NAME}`; use a separate slow scrape for expensive endpoints
+  and discard terminal pods.
+- Remove Prometheus-generated `service.name` and `service.instance.id` when real Kubernetes
+  resource identity is available, and filter to monitored namespaces.
 
-1. **`memory_limiter` is the first processor in every pipeline.** It applies backpressure
-   *before* downstream processors allocate buffers, so a traffic spike sheds load instead of
-   OOM-killing the collector and dropping everything. First, or it cannot protect the
-   allocations that follow it.
-2. **Truncate resource attributes last** (`transform ... truncate_all(resource.attributes, 2048)`).
-   Kubernetes pod annotations can be hundreds of KB and ride along on every record; cap them
-   or one annotation inflates every span/metric/log on the pod.
-3. **Enrich, don't fabricate.** `resourcedetection` + `k8sattributes` add real identity
-   (cloud, node, namespace, workload). Disable `host.name` in the `system` detector so a pod
-   name never masquerades as the node hostname. **Scope the `k8sattributes` informer to the
-   local node** (`filter.node_from_env_var: K8S_NODE_NAME`) — without it every DaemonSet replica
-   watches every pod in the cluster, which is a large and avoidable memory cost at fleet scale.
-   (`resourcedetection` detector *ordering* interacts with `override` and the precedence has
-   differed across versions — pin your distro and confirm which detector wins before relying on it.)
-4. **Restart-safe state.** Persist filelog read offsets via the `file_storage` extension, so
-   a collector restart does not re-read every pod log from the top and duplicate it.
+The preferred DPM pattern is separate receivers over disjoint subsets. For SDK-set OTLP cadence or
+receivers without a partition knob, defer the `routing` connector + `interval` processor fallback
+to `remediation-metric-dpm-reduction`; unmatched passthrough and empty emissions make that pattern
+unsafe to improvise here.
 
-## Metrics: the largest, most reducible bill
+## Logs: cap and scope
 
-Metrics volume is driven by **series count × datapoints-per-minute**. Attack both.
+- Cap individual pod-log records (`max_log_size: 100KiB`) and exclude the collector's own logs.
+- Drop low-value severities only after structured records have a usable `severity_number`.
+- Deduplicate only known-chatty services. Immediately before scoped `logdedup`, remove
+  `log.file.path` and `log.file.record_number` under the same condition or those changing offsets
+  defeat the hash. The shipped YAML deliberately does not enable dedup without a service-specific
+  scope; consult the `otel-collector` `logdedup` reference before adding it.
+- Convert high-volume access logs to metrics only through the validated
+  `remediation-access-log-to-metrics` workflow. Keep `batch` before its connector and confirm the
+  pinned distribution includes the required contrib component.
+- Fix telemetry values embedded in message text at the application with
+  `remediation-structured-logging-migration`, not brittle Collector regexes.
 
-- **Collect a curated set, not the default firehose.** `kubeletstats` and `hostmetrics`
-  default to far more than anyone dashboards. The reference config enables an allowlist
-  (usage + utilization) and turns the rest off. For `hostmetrics`, prefer the bounded
-  `*.utilization` gauges over the per-state monotonic `*.time`/`*.usage` counters, which
-  multiply series.
-- **Scrape no faster than the signal changes, and split fast from slow.** The reference
-  config now ships the **dual-receiver split** baked in: `kubeletstats/main` (container/pod/node)
-  at 20s alongside `kubeletstats/volume` at 60s, and `hostmetrics/fast` (cpu/memory) at 60s
-  alongside `hostmetrics/slow` (filesystem) at 300s. Finer intervals multiply DPM for metrics
-  that barely move.
-- **Drop static-volume metrics (secrets, configmaps, serviceaccount tokens).** kubeletstats
-  emits `k8s.volume.*` for *every* mounted volume, but `secret` / `configMap` / `downwardAPI`
-  volumes and the projected serviceaccount-token volume (`kube-api-access-*`) are read-only with
-  capacity that never moves — those datapoints are pure DPM waste. (`emptyDir` is deliberately
-  **not** dropped: it is writable ephemeral storage and its usage is a real disk-pressure signal.)
-  The reference config's
-  `filter/drop_static_volume_mounts` discards them by `k8s.volume.type` (which requires
-  `extra_metadata_labels: [k8s.volume.type]` on the volume receiver). Dropping is strictly
-  cheaper than slow-scraping. The kube-state-metrics side of the same data — `kube_secret_*`,
-  `kube_configmap_*`, `kube_serviceaccount_*` and the `*_info`/`*_labels` metadata gauges — is
-  near-static too; the `kube-state-metrics-metadata` scrape job keeps only those families at 5m.
-- **Cut datapoints-per-minute on the metrics you keep but that change slowly**
-  (capacity/limits/requests, `*_info`/`*_labels` metadata gauges, replica counts). This is
-  OllyGarden's **metric DPM reduction** remediation — see `remediation-metric-dpm-reduction`
-  for the full catalog and decision tree. Two patterns, in preference order:
-  - **Pattern A — dual-receiver split (preferred, no extra processors; shipped above).** Run the
-    same receiver twice over disjoint metric subsets at different `collection_interval`:
-    `kubeletstats` volume metrics at 60s while container/pod/node stay at 20s; `hostmetrics`
-    `filesystem` at 300s while cpu/memory stay at 60s; two Prometheus scrape jobs splitting
-    fast status metrics (30s) from slow `kube_.*_info|_labels|_limits|_requests` (300s) — the
-    `kube-state-metrics-metadata` job is the slow half of this (the fast KSM job is left for you
-    to add if you want those status metrics). Do NOT just raise the interval on a single
-    receiver — that also downsamples the high-information CPU/memory series.
-  - **Pattern B — `routing` connector + `interval` processor (fallback, not shipped).** Use when
-    the cadence is SDK-set and arrives over OTLP, or the receiver has no partition knob. Route
-    the slow families to a pipeline whose `interval` processor re-emits them on a fixed tick;
-    keep a `default_pipelines` passthrough (unmatched metrics are dropped silently otherwise).
-    `interval` must be longer than the source `collection_interval`, never stack two, and note
-    it emits empty pdata between ticks — any "emission rate" alert must filter empties first.
-- **Shard Prometheus scraping by node.** Each DaemonSet replica scrapes only pods on its own
-  node (`field: spec.nodeName=${K8S_NODE_NAME}`), so N replicas cover a disjoint set instead
-  of every replica scraping every pod. Add a slow tier (`5m`) for expensive endpoints and
-  drop terminal-phase pods.
-- **Kill synthetic Prometheus identity.** The scrape pipeline invents `service.name`
-  (= job name) and `service.instance.id` (= host:port). Delete them so the backend resolves
-  identity from real resource attributes instead of minting high-cardinality junk.
-- **Trim to monitored namespaces.** Node-wide receivers see every namespace; a `filter`
-  drops datapoints whose `k8s.namespace.name` is outside your allowlist.
+## Traces: deterministic noise only
 
-## Logs: cap, dedup at source, and prefer metrics
+- Drop probe spans using the bounded route/path/name patterns in `references/traces.yaml`; the
+  filters cover current and legacy HTTP attributes plus framework handler names. Keep regexes
+  anchored.
+- Prefer source-side suppression for static assets
+  (`remediation-nginx-static-asset-tracing`); use the Collector filter as a portable fallback.
+- Do not probabilistically head-sample at the agent for cost. Keep the agent lossless except for
+  reviewed deterministic noise filters; whole-trace reduction requires gateway
+  `tail_sampling` behind `load_balancing`.
 
-- **Cap line size** (`max_log_size: 100KiB`). A few runaway lines (serialized payloads,
-  stack dumps) otherwise dominate log ingest.
-- **Drop low-value severities** you never query (e.g. sub-INFO in production) with a `filter`.
-  When severity rides inside a structured body rather than on the record, derive
-  `severity_number` first (e.g. `ParseJSON(body)` then map `level`), or the severity filter has
-  nothing to match.
-- **Dedup repeated log lines at the source — but mind the offset attributes.** `logdedup`
-  collapses identical lines over a window, but the `filelog` receiver stamps every record with
-  `log.file.path` and (if enabled) `log.file.record_number`, and `logdedup` hashes the
-  attributes — so unless you strip those two keys first, dedup matches nothing and is a silent
-  no-op. Scope dedup to known-chatty services and strip the offset attributes on the same
-  condition immediately before it. See the `otel-collector` skill's `logdedup` page.
-- **Access logs are cheaper as metrics.** High-volume HTTP access logs whose value is the
-  *aggregate* (request/error rate, latency by route) should be converted to metrics and the
-  raw records dropped — OllyGarden's **access-log-to-metrics** remediation. Three opinions that
-  are easy to get wrong: emit the semconv `http.server.request.duration` **exponential
-  histogram** via a `signal_to_metrics` connector (its count is the request volume, a filtered
-  count is the error rate) — do NOT invent an `http.server.request.count` sum, semconv has no
-  request counter; put the `batch` processor **before** the connector, since it aggregates per
-  incoming batch; and note `signal_to_metrics` is a **contrib-only** connector, so confirm your
-  distro ships it. This pipeline is owned end-to-end (with a validated reproducer) by
-  `remediation-access-log-to-metrics`; use that skill rather than rebuilding it here.
-- **Some log fixes are source-side, not collector-side.** Unstructured logs that bake data
-  into the message string are fixed in app code (structured logging with semconv field
-  names), not by a brittle collector regex — see `remediation-structured-logging-migration`.
-  Point the user at the source fix rather than implying the collector covers it.
+## Self-monitoring
 
-## Traces: drop noise here, sample at the gateway
+Use detailed internal telemetry at a modest reporting interval, with views dropping the noisiest
+high-cardinality internal series. Retain queue, refusal, and export-failure visibility so savings do
+not hide an unhealthy collector.
 
-- **Drop probe spans** (health/readiness/liveness). The probe path lands on `http.route`
-  (stable semconv), `url.path` (current), or the deprecated `http.target` depending on the
-  instrumentation, so the reference filter checks all three; and many frameworks name the span
-  after the handler (Spring → `HealthController.health`, or bare method names like `getStatus` /
-  `isReady`) so there is no `/health` string to match — match the span `name` too. Anchor the
-  name match (`\b…\b`); do **not** copy unanchored field globs like `"*/health.*"` — that is not
-  a valid RE2 anchor and silently matches the wrong spans. Probe spans have been measured at
-  ~28% of all spans in real fleets. There is no agent-side knob for this in the Java
-  instrumentation, so the collector is the right place — see `remediation-java-agent-hygiene`.
-- **Drop static-asset spans** (`.css`, `.js`, images, fonts, `.map`). These are high-volume
-  and never the subject of a latency investigation. The **preferred** fix is at the source —
-  suppress the span in nginx / ingress-nginx (`remediation-nginx-static-asset-tracing`); the
-  collector `filter` on `url.path` is the portable fallback when you do not control the proxy.
-- **Do not head-sample on the agent for cost.** Probabilistic head sampling here saves money
-  but makes per-node keep decisions blind to the whole trace. Real trace reduction is
-  tail-based and belongs at the gateway tier (`tail_sampling` + `load_balancing`), where a
-  whole trace is visible. Keep the agent lossless except for the deterministic noise drops
-  above. (See [Out of scope](#out-of-scope).)
+## Reference configuration
 
-## Self-monitoring: watch the collector, cheaply
+Copy the full set and search for `CUSTOMIZE`:
 
-Run the collector's internal telemetry at `level: detailed` but drop the noisiest,
-highest-cardinality internal series with metric `views` (e.g. `otelcol.k8s.pod.association`,
-`http.*`/`rpc.*` client/server histograms), and report on a 30s reader. You want to see queue
-depth and refusals without the agent's self-telemetry becoming its own cost line.
+- `references/common.yaml` — shared receiver, processors, exporter, state, and self-telemetry.
+- `references/traces.yaml`, `metrics.yaml`, `logs.yaml` — one complete signal pipeline each.
+- `references/prometheus/*.yaml` — bare scrape-job fragments included by `metrics.yaml`.
 
-## Out of scope
-
-These belong in the gateway/cluster collector, not the node agent:
-
-- **Tail sampling and load balancing.** A whole-trace keep/drop decision needs every span of
-  a trace in one place; on a node agent you only have the local spans. Run `tail_sampling`
-  behind a `load_balancing` exporter in the gateway tier.
-- **Cluster-singleton metrics.** `k8s_cluster` and `k8s_events` must run once per cluster, not
-  once per node — otherwise every node double-counts them. Their tuning (e.g. dropping
-  zero-value replicaset datapoints, disabling `k8s.namespace.phase`) lives in that Deployment.
-
-## Decomposing this config
-
-The reference config is split into multiple files, not one monolith. The layout we ship is
-**by signal pipeline** — [`common.yaml`](references/common.yaml) for everything shared by all
-three pipelines, plus a self-contained [`traces.yaml`](references/traces.yaml),
-[`metrics.yaml`](references/metrics.yaml), and [`logs.yaml`](references/logs.yaml) (each with
-its own `service.pipelines.<signal>` entry). The Prometheus scrape jobs are pulled in as
-bare-fragment files under [`references/prometheus/`](references/prometheus/) via `${file:}`.
-
-The generic **mechanics** of collector-config decomposition — how the deep merge reassembles
-the files, the alternative split strategies, and the caveats that bite silently (arrays are
-replaced not merged; `${file:}` paths resolve relative to the working directory, so run from
-inside `references/`) — live in the **`ollygarden-otel-collector-config-decomposition`** skill.
-Read it before editing this file set;
-[`references/decomposing-config.md`](references/decomposing-config.md) only records how *this*
-config maps onto that pattern.
+Read `references/decomposing-config.md` before editing. Processor arrays replace rather than merge,
+and `${file:}` paths depend on the Collector working directory.
 
 ## Verify before shipping
 
-Validate the **merged** set (never a single fragment) from inside `references/`:
+Complete every gate below; a parser-only or single-fragment check is not verification:
 
-```sh
-cd references
-otelcol-contrib validate \
-  --config file:common.yaml --config file:traces.yaml \
-  --config file:metrics.yaml --config file:logs.yaml
-```
+1. Obtain `common.yaml`, `traces.yaml`, `metrics.yaml`, and `logs.yaml`; if one is missing, stop and
+   request it. From `references/`, validate all four together against the pinned distribution.
+2. Supply non-secret synthetic `K8S_NODE_NAME`, `K8S_CLUSTER_NAME`, and exporter endpoint values,
+   then inspect `print-config` output for all pipelines, processor order, and included scrape jobs.
+3. Use sanitized positive and near-miss telemetry to prove each filter drops only its intended
+   target. Never use production ingest/export endpoints for verification.
 
-`validate` instantiates the pipeline and compiles OTTL, but several errors off-cluster are pure
-artifacts (cloud `resourcedetection` detectors, `kubeletstats` `auth_type: serviceAccount`,
-`hostmetrics` `root_path: /hostfs`) and can mask a real one, since the build aborts at the first
-failure. See [`references/validating.md`](references/validating.md) for the full workflow: the
-`print-config` merge-inspection command, the throwaway off-cluster overlay that forces the whole
-pipeline to build, and why `validate` still can't confirm env resolution or that OTTL matches
-your data.
+Follow `references/validating.md` for the exact commands, disposable off-cluster overlay, and
+version limits.
 
-## Cross-references
+## Handoffs
 
-- Component facts: **`otel-collector`** (receivers/processors/exporters/connectors, renames).
-- OTTL: **`otel-ottl`** (the conditions and statements in the filter/transform blocks).
-- Config decomposition mechanics (the deep merge, split strategies, and merge caveats behind
-  this file set): **`ollygarden-otel-collector-config-decomposition`**.
-- Optimization remediations this config draws on or defers to:
-  - `remediation-metric-dpm-reduction` — dual-receiver split / `interval` patterns and the
-    per-metric target-interval catalog.
-  - `remediation-access-log-to-metrics` — the full access-log → `signaltometrics` pipeline.
-  - `remediation-nginx-static-asset-tracing` — source-side span suppression for static assets.
-  - `remediation-java-agent-hygiene` — health-check filtering plus the agent-side knobs.
-  - `remediation-structured-logging-migration` — app-code structured logging.
-- Source-side fixes the collector can't make: `ollygarden-otel-sdk-setup`,
-  `ollygarden-otel-manual-instrumentation`, and the language `ollygarden-otel-*-setup` skills.
+- Component configuration and OTTL: `otel-collector`, `otel-ottl`.
+- Generic deep-merge mechanics: `ollygarden-otel-collector-config-decomposition`.
+- DPM reduction: `remediation-metric-dpm-reduction`.
+- Access logs to metrics: `remediation-access-log-to-metrics`.
+- Probe/static/source logging fixes: `remediation-java-agent-hygiene`,
+  `remediation-nginx-static-asset-tracing`, `remediation-structured-logging-migration`.

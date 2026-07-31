@@ -1,0 +1,11 @@
+receivers:
+  kubeletstats:
+    collection_interval: 300s
+    metric_groups: [container, pod, node, volume]
+
+service:
+  pipelines:
+    metrics:
+      receivers: [kubeletstats]
+      processors: [memory_limiter, batch]
+      exporters: [otlp]
