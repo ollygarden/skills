@@ -1,0 +1,25 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+
+processors:
+  filter/health:
+    error_mode: ignore
+    traces:
+      span:
+        - attributes["http.route"] == "/healthz"
+  batch:
+
+exporters:
+  otlp:
+    endpoint: ${env:BACKEND_ENDPOINT}
+    headers:
+      authorization: ${env:BACKEND_TOKEN}
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [filter/health, batch]
+      exporters: [otlp]

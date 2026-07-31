@@ -1,0 +1,53 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+  tail_sampling:
+    decision_wait: 10s
+    policies:
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+  filter/metrics:
+    metrics:
+      metric:
+        - name == "demo.noise"
+  filter/logs:
+    logs:
+      log_record:
+        - severity_number < SEVERITY_NUMBER_INFO
+  batch:
+
+exporters:
+  otlp:
+    endpoint: backend.example.test:4317
+    tls:
+      insecure: false
+
+extensions:
+  health_check:
+
+service:
+  extensions: [health_check]
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, tail_sampling, batch]
+      exporters: [otlp]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/metrics, batch]
+      exporters: [otlp]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/logs, batch]
+      exporters: [otlp]

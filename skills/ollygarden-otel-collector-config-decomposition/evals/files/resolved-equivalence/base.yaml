@@ -1,0 +1,18 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+
+processors:
+  filter/health:
+    error_mode: ignore
+    traces:
+      span:
+        - attributes["http.route"] == "/healthz"
+  batch:
+
+exporters:
+  otlp:
+    endpoint: placeholder.invalid:4317
+    headers:
+      authorization: ${env:BACKEND_TOKEN}

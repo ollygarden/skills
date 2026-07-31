@@ -1,64 +1,68 @@
-# Verifying a decomposition is behavior-preserving
+# Verify behavior-preserving decomposition
 
-Companion reference for the `ollygarden-otel-collector-config-decomposition` skill. A split
-that changes what the collector does is a bug, not a refactor. Two checks prove it didn't:
-**the merged set validates**, and **the fully-resolved config matches the original monolith.**
+A pure decomposition must pass merged validation and resolved equivalence. Captured 2026-07:
+`print-config` remains version-sensitive, so confirm the pinned distribution supports it with
+`otel-collector`.
 
-## 1. Validate the merged set — never a fragment
+## 1. Freeze inputs
 
-Pass every file, in order, to `validate`. A lone signal or component file references shared
-pieces it doesn't define and will fail on its own — that failure is noise, not signal.
+Record the exact Collector distribution and version, configuration source order, working directory,
+and required environment values. Use the same binary, environment, validation mode, and provider
+inputs for the monolith and split. Do not substitute production secrets into review artifacts.
+
+## 2. Validate the complete configurations
+
+Validate the monolith and the complete ordered split set, never a fragment:
 
 ```sh
-# from the directory that makes any ${file:} include paths resolve (see mechanics.md, caveat 2)
+otelcol-contrib validate --config=file:monolith.yaml
+
 otelcol-contrib validate \
-  --config file:common.yaml --config file:traces.yaml \
-  --config file:metrics.yaml --config file:logs.yaml
+  --config=file:common.yaml \
+  --config=file:traces.yaml \
+  --config=file:metrics.yaml \
+  --config=file:logs.yaml
 ```
 
-`validate` instantiates the pipeline and compiles OTTL, but it does **not** confirm that env
-vars resolve, that `${file:}` includes inlined, or that a rule matches your data. It is
-necessary, never sufficient. Set any env vars the config requires (empty required fields like
-an `otlp` exporter `endpoint` do fail validation).
+Validation instantiates components and compiles expressions. It is necessary, but does not prove
+that a rule matches telemetry or that a connector routes it correctly.
 
-## 2. Diff the fully-resolved config against the monolith
+## 3. Compare both fully resolved outputs
 
-`print-config` emits the config **after** merging and env substitution — exactly what the
-collector would run. That's the artifact to compare against the pre-split monolith:
+Run `print-config` for both forms under the frozen inputs. Keep its default redacted mode; an
+unredacted artifact can expose credentials and is unnecessary for this comparison.
 
 ```sh
-otelcol-contrib print-config \
-  --config file:common.yaml --config file:traces.yaml \
-  --config file:metrics.yaml --config file:logs.yaml > merged.yaml
+otelcol-contrib print-config --mode=redacted \
+  --config=file:monolith.yaml > original.resolved.yaml
+
+otelcol-contrib print-config --mode=redacted \
+  --config=file:common.yaml \
+  --config=file:traces.yaml \
+  --config=file:metrics.yaml \
+  --config=file:logs.yaml > split.resolved.yaml
 ```
 
-Compare `merged.yaml` to the original. A structural (not textual) diff is what matters — key
-order and formatting will differ, semantics must not. Comparing **key sets** is not enough: a
-changed receiver endpoint or exporter TLS setting keeps the same keys but changes behavior. In
-Python (pyyaml), load both sides and assert:
+If the pinned distribution lacks this experimental command, use its supported configuration
+resolver; do not claim equivalence from raw concatenation or key inspection.
 
-- the two parsed configs are **recursively equal in full** — every `receivers` / `processors` /
-  `exporters` / `extensions` / `connectors` entry and the `service` block, values included, not
-  just the key sets. Normalize first so only real differences remain (e.g. round-trip both
-  through `yaml.safe_load`; treat maps as order-independent);
-- within that, a pipeline's `processors` is a **list**, so compare it order-sensitively —
-  processors run in sequence, and `[a, b]` ≠ `[b, a]`;
-- the *only* differences allowed are ones you introduced on purpose: if you split one processor
-  into two, apply a rename map before comparing, and assert the split pieces carry the original
-  OTTL statements/conditions **verbatim**.
+Parse and recursively compare `original.resolved.yaml` with `split.resolved.yaml`:
 
-Any unexplained difference means the merge didn't reassemble what you started with — most often
-the array-replace caveat silently dropping a processor from a pipeline's list, or an overlay
-value quietly winning over the base.
+- compare all component definitions, extensions, connectors, and the full `service` block;
+- ignore map ordering and serialization differences;
+- compare sequences order-sensitively, especially pipeline processors;
+- permit only separately authorized changes, documented one by one.
 
-Confirm nested includes actually inlined: `grep -c` the resolved output for a token that only
-appears inside an included fragment (e.g. `job_name` for Prometheus scrape jobs) and check the
-count matches the number of includes.
+Do not compare resolved split output directly with raw monolith YAML. Resolution can add defaults,
+expand providers, and redact sensitive fields. For fields hidden by redaction, separately confirm
+that both source forms preserve the same provider expression or value source under the frozen
+environment; never persist secret values merely to make the diff visible.
 
-## 3. Behavioral proof (when a component's correctness is in question)
+## 4. Escalate behavioral questions
 
-`validate` + equivalence-diff prove the *structure* is preserved. They do **not** prove a
-`filter` still drops the right spans or a `transform` still sets the right attribute against
-real telemetry. When that's the question — especially if you split or moved a processor — hand
-off to the **`ollygarden-otel-collector-config-validation`** skill, which runs the component
-under test against generated telemetry and asserts the output.
+Resolved equality proves the refactor preserved configuration structure. It does not prove that a
+filter drops the intended records, a transform sets the right field, or a connector routes inputs.
+For those claims, hand the unchanged component to `ollygarden-otel-collector-config-validation` and
+test matching and non-matching telemetry with two-sided assertions. Name that handoff explicitly in
+the decision report; a generic suggestion to test the component does not identify the responsible
+workflow.
