@@ -1,0 +1,25 @@
+connectors:
+  routing/tenant:
+    default_pipelines: [traces/default]
+    table:
+      - context: span
+        condition: 'attributes["tenant.tier"] == "checkout"'
+        pipelines: [traces/checkout]
+      - context: span
+        condition: 'attributes["tenant.tier"] == "ordinary"'
+        pipelines: [traces/ordinary]
+
+service:
+  pipelines:
+    traces/in:
+      receivers: [otlp]
+      exporters: [routing/tenant]
+    traces/checkout:
+      receivers: [routing/tenant]
+      exporters: [otlp_grpc/checkout]
+    traces/ordinary:
+      receivers: [routing/tenant]
+      exporters: [otlp_grpc/ordinary]
+    traces/default:
+      receivers: [routing/tenant]
+      exporters: [otlp_grpc/default]

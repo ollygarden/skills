@@ -1,246 +1,110 @@
 ---
 name: ollygarden-otel-collector-config-validation
-description: OllyGarden's end-to-end method for validating an OpenTelemetry Collector config by running it — proving a processor or connector transforms, drops, or routes telemetry as intended, not just that the YAML parses. Use whenever someone wants to test, verify, or prove a Collector processor or connector (filter, transform, attributes, redaction, tail_sampling, interval, routing, signaltometrics, count, spanmetrics) against realistic telemetry. Triggers on phrasings like "does my filter actually drop the right spans", "prove this transform works before I ship it", "otelcol validate passes but the rule does the wrong thing", "spin up a throwaway collector and inspect the output". Runs otelcol-contrib validate, then a real collector in Docker or Podman fed by telemetrygen with a file exporter, and asserts the output. Prefer over otel-collector or otel-ottl when the goal is to behaviorally test a config, not look up syntax. Processors and connectors only; receivers/exporters become an OTLP-in / file-out harness.
+description: Behaviorally validate an OpenTelemetry Collector processor or connector against realistic telemetry. Use for "does my filter drop the right spans?", "prove this transform before shipping", "validate passes but behavior is wrong", or testing filter, transform, redaction, tail_sampling, routing, signaltometrics, count, or spanmetrics. Running the harness executes a pinned remote container and requires explicit confirmation. Not for syntax lookup (use `otel-collector`/`otel-ottl`), generic telemetry generation (`otel-telemetrygen`), or receiver/exporter testing.
 license: Apache-2.0
 ---
 
-# Validating an OTel Collector config — end to end
+# Validate Collector behavior end to end
 
-This skill is OllyGarden's opinion that **validating a collector config means an end-to-end
-behavioral test, not a structural one**. `otelcol validate` tells you the YAML parses and the
-components exist; it does **not** tell you the `filter` drops the spans you meant, the
-`transform` sets the attribute you expect, or the `routing` connector sends each signal down
-the right pipeline. The only way to know that is to run the component under test against the
-*exact shape* of telemetry it will see and read back what comes out.
+`otelcol validate` proves structure, not behavior. Prove the component under test against the
+exact telemetry shape it will receive, then assert the transformed, dropped, or routed result.
 
-It layers on upstream facts — point at these rather than duplicating them:
+Use upstream skills for volatile facts:
 
-- Component config keys, defaults, signal support, renames → the **`otel-collector`** skill.
-- OTTL statement/condition syntax in `filter`/`transform`/`routing` → the **`otel-ottl`** skill.
-- `telemetrygen` flags and the bare verify recipe → the **`otel-telemetrygen`** skill. This
-  skill is the disciplined, repeatable workflow built on that recipe.
+- `otel-collector` — component keys, signal support, stability, and connector semantics.
+- `otel-ottl` — filter, transform, and routing expressions.
+- `otel-telemetrygen` — current flags and supported input shapes.
 
-## Scope: processors and connectors only
+## Scope and invariants
 
-Validate the component **under test** — a processor (`transform`, `filter`, `attributes`,
-`redaction`, `tail_sampling`, `interval`, …) or a connector (`routing`, `signaltometrics`,
-`count`, `spanmetrics`, …). The real receivers and exporters of the production config are
-**not** under test here; they are replaced by a fixed harness:
+This workflow tests one processor or connector. Replace production ingress and egress with OTLP-in
+and file-out; receiver scraping, exporter connectivity, authentication, and backpressure are other
+tests. Copy the production **component block** unchanged. Harness names, receivers, exporters, and
+pipeline wiring may differ, but retyping the component means testing a different config.
 
-- **In:** an `otlp` receiver, so `telemetrygen` can feed it.
-- **Out:** a `file` exporter, so the result is inspectable JSON on disk.
+Never mutate the production file. Work from a throwaway copy and keep every generated artifact in
+a fresh scratch directory.
 
-This isolates the behavior you care about. Testing the production `kafka`/`prometheus`/vendor
-exporters is a different job (connectivity, auth, backpressure) and out of scope. If the
-config's *receivers* are what's in question (scrape configs, filelog operators), that is also
-out of scope — this skill assumes telemetry arrives over OTLP.
+## Workflow
 
-## The five stages
+### 1. Pin the target and validate statically
 
-Run them in order. Stage 1 is cheap and catches typos; stages 2–5 catch the bugs that matter.
-
-### Stage 1 — Static validate
+Identify the deployed Collector distribution and version. Confirm it contains the component, then
+run its matching binary against the harness:
 
 ```sh
 otelcol-contrib validate --config harness.yaml
 ```
 
-This checks structure, component existence, and OTTL syntax, and instantiates the pipeline.
-It does **not** check that env vars resolve, that OTTL matches your data, or that routing
-sends data where you think. A clean `validate` is necessary, never sufficient. (See the
-`ollygarden-otel-collector-k8s-daemonset` skill for the off-cluster caveats of `validate`.)
+Do not validate with one version and execute another. A clean result is required but does not prove
+environment substitution, data matching, routing, or output. State that limitation explicitly in
+the final plan; do not let static validation appear to be behavioral evidence.
 
-### Stage 2 — Build the harness config
+### 2. Build the isolated harness
 
-Wrap the component under test between an `otlp` receiver and a `file` exporter. Keep the
-component's config **byte-for-byte identical** to the production config — copy it, do not
-retype it, or you are testing a different component.
+Read [`references/harnesses.md`](references/harnesses.md). Use `0.0.0.0:4317` inside the container,
+one file exporter per asserted destination, and a separate setup transform only when telemetrygen
+cannot express the input shape. The component under test stays unchanged.
 
-```yaml
-receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317      # 0.0.0.0, not localhost — reachable from the container's view
+Define every case before running:
 
-processors:
-  # OPTIONAL: shape the input telemetrygen can't express (span name, kind, specific attrs).
-  transform/setup:
-    error_mode: ignore
-    trace_statements:
-      - context: span
-        statements:
-          - set(name, "GET /health")
+| Component | Required evidence |
+| --- | --- |
+| Filter/drop | A matching record is absent **and** a non-matching record is present. |
+| Transform/attributes | The exact target field has the expected value. |
+| Routing | Each record is present only in its expected route; unmatched input reaches `default_pipelines`. |
+| Metric-producing connector | Expected series name, type, and datapoint value match the input count/condition. |
 
-  # THE COMPONENT UNDER TEST — copied verbatim from the production config.
-  filter/under_test:
-    error_mode: ignore
-    traces:
-      span:
-        - 'IsMatch(name, "GET /health.*")'
+Use a separate scratch output per case. Empty output alone is never a pass: it can also mean the
+Collector crashed or received nothing.
 
-exporters:
-  file:
-    path: /output/result.json
-    flush_interval: 200ms
+### 3. Preflight remote execution and request confirmation
 
-service:
-  pipelines:
-    traces:
-      receivers: [otlp]
-      processors: [transform/setup, filter/under_test]
-      exporters: [file]
+Determine Docker or Podman, whether SELinux is enforcing, host UID/GID behavior, port availability,
+and the exact immutable image for the deployed version.
+
+**Get explicit user confirmation before pulling or running remote container code.** Show the exact
+registry, image, tag, and digest; explain that the runtime may download and execute that image; then
+wait for an affirmative response. The original validation request is not consent to pull or run it.
+
+Known example, captured 2026-07 (use only when it matches the target version):
+
+```text
+docker.io/otel/opentelemetry-collector-contrib:0.156.0@sha256:125bdbeb7590cc1952c5b3430ecf14063568980c2c93d5b38676cc0446ed8108
 ```
 
-**Connectors take two pipelines.** A connector is an exporter in its source pipeline and a
-receiver in its destination pipeline. Wire both, with a `file` exporter on the destination:
+Never execute a tag-only reference. Re-resolve and review the digest when changing the tag.
+If the user did not supply a deployed version, present the exact known example above as a candidate
+and ask them to approve it or provide the target version. Do not replace the tag or digest with a
+placeholder, and do not execute until one exact reference is confirmed.
 
-```yaml
-connectors:
-  routing/under_test:
-    default_pipelines: [traces/other]
-    table:
-      - context: span
-        condition: 'attributes["http.route"] == "/checkout"'
-        pipelines: [traces/checkout]
+On enforcing SELinux, `:Z` privately relabels a host path in place. Apply it only to the fresh
+scratch config copy and output directory—never a shared directory, home directory, or sole config
+copy. Publish the unauthenticated test receiver on host loopback only.
 
-service:
-  pipelines:
-    traces/in:        { receivers: [otlp],              exporters: [routing/under_test] }
-    traces/checkout:  { receivers: [routing/under_test], exporters: [file/checkout] }
-    traces/other:     { receivers: [routing/under_test], exporters: [file/other] }
-```
+Before stopping for approval, the preflight must explicitly include all of these review items:
 
-Give each route its **own** `file` exporter (`file/checkout`, `file/other`) so you can assert
-*where* each record landed, not just that it survived. For metric-producing connectors
-(`signaltometrics`, `count`, `spanmetrics`) the destination pipeline is a `metrics` pipeline —
-assert on the emitted series and remember the count/sum semantics described in `otel-collector`.
+- exact registry/image/tag/digest and the statement that it may be downloaded and executed;
+- fresh scratch paths and the host-label mutation risk of private `:Z` relabeling;
+- host `127.0.0.1` publication with in-container `0.0.0.0` binding;
+- host UID/GID behavior, including the rootless Podman exception;
+- bounded readiness/exit detection, cleanup, stop-to-flush, and the exact value assertion.
 
-### Stage 3 — Pick a container runtime (Docker or Podman, + SELinux)
+Use an unambiguous disclosure: **“This may download and execute remote container code.”** Do not
+soften it to “pull an image” or assume the user understands what a container run executes.
 
-Use whichever is installed; the run command is nearly identical:
+### 4. Run only after approval
 
-```sh
-if command -v podman >/dev/null 2>&1; then RUNTIME=podman
-elif command -v docker >/dev/null 2>&1; then RUNTIME=docker
-else echo "need docker or podman" >&2; exit 1; fi
-```
+After the exact image is approved, read [`references/run-harness.md`](references/run-harness.md).
+Its bounded readiness check must fail if the container exits or never becomes ready, and its cleanup
+trap must remove the test container. On rootless Podman, omit `--user` if UID mapping prevents output.
 
-**SELinux bind-mount relabeling.** On SELinux systems (Fedora, RHEL, CentOS Stream) a bind
-mount is unreadable inside the container unless the host path is relabeled. Append the **`:Z`**
-flag to each bind mount so the runtime relabels it with a container-private SELinux category:
+Generate the exact signal, resource attributes, telemetry attributes, name, kind, severity, and
+metric type required by each case. Never send telemetry after failed startup.
 
-```sh
-SEL=""
-if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" = "Enforcing" ]; then SEL=":Z"; fi
-```
+### 5. Flush and assert
 
-- **`:Z` (uppercase) = private**, unshared label — correct for these single-collector scratch
-  mounts. `:z` (lowercase) is the *shared* label for paths several containers mount at once;
-  you don't need it here.
-- **Only relabel scratch paths.** `:Z` rewrites the SELinux label of the host path in place.
-  Pointing it at a path other processes also use (a shared config dir, `$HOME`) can break their
-  access. Mount a throwaway copy of the config and a fresh output dir — never `:Z` a path you
-  don't own.
-- Off SELinux, leave the suffix empty (`SEL=""`); an unnecessary `:Z` is at best a no-op and at
-  worst relabels a host path for nothing.
-
-### Stage 4 — Confirm, then run the collector and generate the telemetry shape
-
-Work in a scratch directory with `harness.yaml` from Stage 2 in it — a throwaway copy you're
-willing to let `:Z` relabel (see Stage 3), never your only copy of a shared config.
-
-**Get explicit user confirmation before pulling or running remote container code.** Show the
-user the exact image reference, registry, tag, and digest below, explain that the runtime may
-download and execute it, and wait for an affirmative response. The original request to validate
-a config is not consent to pull or run the image. Do not execute any `pull` or `run` command if
-the user declines or has not responded.
-
-```sh
-mkdir -p ./out
-
-$RUNTIME run -d --rm --name otelcol-verify \
-  -p 127.0.0.1:4317:4317 \
-  --user "$(id -u):$(id -g)" \
-  -v "$(pwd)/harness.yaml:/etc/otelcol-contrib/config.yaml:ro$SEL" \
-  -v "$(pwd)/out:/output$SEL" \
-  docker.io/otel/opentelemetry-collector-contrib:0.156.0@sha256:125bdbeb7590cc1952c5b3430ecf14063568980c2c93d5b38676cc0446ed8108 \
-  --config=/etc/otelcol-contrib/config.yaml
-
-# wait until the collector reports ready, then feed it. Grepping the runtime's own
-# logs is portable across host operating systems, unlike a host-side port probe
-# (ss/nc aren't available by default on macOS).
-until $RUNTIME logs otelcol-verify 2>&1 | grep -q "Everything is ready"; do sleep 0.25; done
-telemetrygen traces --otlp-insecure --traces 1 --service "checkout"
-```
-
-Generate the *exact* shape the component is supposed to act on — matching `service.name`,
-resource and telemetry attributes, span kind, severity, metric type. See the **`otel-telemetrygen`**
-skill for the flags; what telemetrygen can't set directly (span name, span kind, renames), set
-with the `transform/setup` processor from Stage 2.
-
-Two runtime caveats:
-
-- **`--user "$(id -u):$(id -g)"`** lets the `file` exporter write to the bind-mounted output
-  dir as you. On **rootless Podman** the container already runs as your user, so this flag is
-  usually unnecessary and can even mismap — drop it if the file exporter can't write.
-- **`-p 127.0.0.1:4317:4317`** lets host-side `telemetrygen` reach `localhost:4317` without
-  exposing the unauthenticated test receiver on external host interfaces. If loopback port
-  publishing is unavailable, run telemetrygen as a second container on a private shared network.
-- **Pin the image by digest.** The example retains the `0.156.0` tag for readability but the
-  digest makes execution immutable. When updating the release, resolve its multi-platform
-  manifest digest from Docker Hub registry metadata and update the tag and digest together;
-  never execute a tag-only reference. Mind the tag formats: the Docker Hub
-  `otel/opentelemetry-collector-contrib` image is **unprefixed** (`:0.156.0`), while the ghcr
-  `telemetrygen` image is **`v`-prefixed** (`:v0.156.0`). See `otel-telemetrygen` for the
-  telemetrygen image.
-
-### Stage 5 — Assert the output
-
-Stop the collector first to flush the file exporter, then read the JSON back and **assert on
-its contents**. "No error in the logs" is not a pass.
-
-```sh
-$RUNTIME stop otelcol-verify           # flushes the file exporter
-python3 -m json.tool ./out/result.json # or: jq . ./out/result.json
-```
-
-Assert the **transformation**, not just the presence of output:
-
-- **A `filter`/drop rule** — run it twice. Send a record that *should* be dropped and assert the
-  matching route's output is empty; then send one that should *survive* and assert it's present.
-  Empty output alone is ambiguous: it also happens when the collector crashed or never received
-  data. Both halves are required.
-- **A `transform`/`attributes` rule** — assert the specific attribute/field has the new value in
-  the output record, not merely that a record came through.
-- **A `routing` connector** — assert each record landed in the *right* per-route file and is
-  *absent* from the others. Don't forget a record that matches no rule: confirm it went to
-  `default_pipelines` (and isn't silently dropped).
-- **A metric-producing connector** — assert the expected series name, type, and that its
-  datapoint value reflects the input volume/condition (e.g. an error-filtered count equals the
-  number of error inputs).
-
-## Pitfalls
-
-- **Trusting `validate`.** It is stage 1 of 5. A config that validates can still drop the wrong
-  spans or route to the wrong pipeline.
-- **Re-typing the component under test.** Copy it from the production config; a hand-retyped
-  approximation tests a config you'll never ship.
-- **Asserting "something came out".** Survival ≠ correctness. Assert the changed value, or the
-  specific route, or the emitted series.
-- **One-sided filter tests.** Only checking that matching records are gone (or only that
-  non-matching survive) misses the half where the rule is too greedy or too lax.
-- **`endpoint: localhost:4317` in the harness.** Inside the container that binds the loopback
-  interface only; use `0.0.0.0:4317` so the receiver is reachable.
-- **Forgetting `default_pipelines` on `routing`.** Unmatched telemetry is dropped silently —
-  if your test only sends matching data you won't notice the hole.
-- **Reading the file before the collector flushed.** Stop the container (or wait past
-  `flush_interval`) before asserting, or you'll read a partial/empty file.
-
-## Cross-references
-
-- Component facts (keys, defaults, signal support, connector semantics): **`otel-collector`**.
-- OTTL in the filter/transform/routing rules under test: **`otel-ottl`**.
-- `telemetrygen` flags and the underlying verify recipe: **`otel-telemetrygen`**.
-- `validate`'s off-cluster caveats and the broader "verify before shipping" stance:
-  **`ollygarden-otel-collector-k8s-daemonset`**.
+Stop the Collector before reading output so the file exporter flushes. Parse the configured file
+format, confirm the Collector received the positive control, and evaluate every presence, absence,
+route, and value assertion. Preserve the commands, input markers, output excerpts, Collector version,
+image digest, and result for review. “No errors” and “something came out” are not assertions.

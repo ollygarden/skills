@@ -1,0 +1,22 @@
+receivers:
+  otlp/production:
+    protocols:
+      grpc: {}
+
+processors:
+  filter/health:
+    error_mode: ignore
+    traces:
+      span:
+        - 'IsMatch(name, "GET /healthz.*")'
+
+exporters:
+  otlp_grpc/backend:
+    endpoint: telemetry.example.invalid:4317
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp/production]
+      processors: [filter/health]
+      exporters: [otlp_grpc/backend]
