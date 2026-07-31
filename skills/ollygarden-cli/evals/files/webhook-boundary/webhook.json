@@ -1,0 +1,13 @@
+{
+  "data": {
+    "id": "12345678-1234-4234-8234-123456789abc",
+    "name": "alerts-prod",
+    "url": "https://hooks.example.com/ollygarden",
+    "enabled": true,
+    "min_severity": "Important"
+  },
+  "synthetic_target": {
+    "context": "prod-eu",
+    "api_url": "https://api.ollygarden.cloud"
+  }
+}
