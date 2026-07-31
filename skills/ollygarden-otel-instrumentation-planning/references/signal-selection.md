@@ -33,12 +33,10 @@ Expected conditions are not automatically errors. Classify validation failures, 
 empty results, cancellations, and client responses from the application's contract rather than
 from a universal status-code rule.
 
-## Event/log API status
+## Event/log API selection
 
-Status captured 2026-07-31: the accepted span-events-to-logs migration plan does not make every
-released span-event API deprecated, and bridge support varies by language and version. Consult
-`otel-span-events-to-logs-migration` before selecting a current API or claiming that a log record
-also appears as a span event. Keep version-specific event names out of this plan.
+Consult `otel-span-events-to-logs-migration` before selecting a current API or claiming that a log
+record also appears as a span event. Keep version-specific event names out of this plan.
 
 ## Static facts versus occurrences
 

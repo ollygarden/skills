@@ -4,6 +4,8 @@ import { Pool } from "pg";
 const app = express();
 const pool = new Pool();
 
+app.use(express.json());
+
 app.get("/healthz", (_request, response) => response.send("ok"));
 
 app.post("/checkout", async (request, response) => {

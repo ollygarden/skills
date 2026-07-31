@@ -1,6 +1,9 @@
 {
   "name": "brownfield-checkout-fixture",
   "private": true,
+  "scripts": {
+    "start": "node --import ./dist/telemetry.js ./dist/app.js"
+  },
   "dependencies": {
     "@opentelemetry/auto-instrumentations-node": "^0.64.0",
     "@opentelemetry/sdk-node": "^0.205.0",
