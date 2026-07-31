@@ -1,253 +1,99 @@
 ---
 name: ollygarden-otel-declarative-config
-description: Ollygarden's recommended patterns and anti-patterns for OpenTelemetry declarative configuration. Use when reviewing or authoring otel.yaml files, when deciding whether declarative config is right for a project, or when the user asks for "the right way" to configure OpenTelemetry. Triggers on "otel best practices", "otel anti-patterns", "is this otel config correct", "should I use declarative config".
+description: OllyGarden's review policy for OpenTelemetry declarative YAML. Use for "should I use declarative config?", "review this otel.yaml against OllyGarden conventions", or "what are OllyGarden's config anti-patterns?" Use with the relevant language setup skill when a runtime is known. Not for schema keys, file-format versions, activation, SDK support, or general SDK wiring; use `otel-declarative-config` and the language skills.
 ---
 
-# Declarative Configuration Conventions
+# Declarative configuration conventions
 
-## The file replaces properties and env vars — not code
+This skill owns OllyGarden policy, not versioned OpenTelemetry syntax. Use
+`otel-declarative-config` for schema, substitution, precedence, and the compatibility matrix; use
+the relevant upstream language skill and `ollygarden-otel-*-setup` skill for released activation
+and language-specific resource policy. Upstream support status last checked 2026-07.
 
-Declarative YAML supersedes scattered `otel.*` properties, `-Dotel.*` flags, and
-SDK-setting `OTEL_*` variables. It does **not** supersede SDK components registered
-through code: `SpanProcessor`s (e.g. an attribute-stripping processor that removes
-`url.query`/`url.full`), custom samplers, and other SPI-registered components keep
-working alongside the file and stay where they are. When migrating a service to
-declarative config, inventory the code-registered components first — each one either
-has a schema-supported equivalent (move it) or it does not (keep the code); deleting one
-because "everything is YAML now" silently removes the guarantee it enforced.
+## Decision gate
 
-Two facts make this failure silent:
+Before recommending, reviewing, or generating a file:
 
-- **Unrecognized keys under `instrumentation/development` are ignored, not rejected** —
-  that subtree is not schema-validated. A misspelled or invented node (including a missing
-  experimental `/development` key suffix) parses, boots, and does nothing.
-- **A config file that boots proves only that it parsed.** After the migration, re-run the
-  behavioral verification for every guarantee the old setup enforced (e.g. a
-  marker-value request to prove sensitive data still doesn't export) — never conclude
-  from the YAML's contents.
+1. Identify the exact runtime, package/agent, and version that will parse it.
+2. Ask `otel-declarative-config` and the relevant language skill whether every required feature is
+   released, how the file is activated, and which `file_format` and fields that parser accepts.
+3. Prefer declarative config only when that support is adequate and the user accepts any
+   experimental dependency. Otherwise preserve the current env-var or programmatic setup.
 
-## Why declarative config is the default for new projects
+Do not maintain a language-support table here. A former blanket Python fallback is obsolete:
+Python 1.44 introduced released experimental file configuration through the
+`opentelemetry-configuration` package; `opentelemetry-sdk[file-configuration]` remains a
+compatibility alias as of 2026-07. The upstream Python and declarative skills must still supply
+current package, activation, and schema details. Do not recommend declarative YAML for .NET until
+its upstream skill reports released support.
 
-Prefer declarative YAML configuration over scattered `OTEL_*` environment variables and over
-programmatic SDK construction:
+## Migration gate: settings are not arbitrary code
 
-- It uses a shared schema across languages, subject to each runtime's released support matrix
-- It's version-controlled alongside application code
-- It expresses things env vars cannot: views, composite samplers, multiple exporters
-- It supports `${VAR}` substitution for secrets and environment-specific values
+Inventory code-registered processors, samplers, detectors, instrumentations, and other guarantees
+before migration. Move one only when the selected runtime has a verified declarative equivalent;
+otherwise keep it in code. Reviewing or adding a file does not authorize deleting code controls.
+If the user or migration diff says a control existed but the current snapshot no longer shows its
+registration, treat it as a claimed guarantee: inspect history or ask for the before-state instead
+of dismissing it as unused.
 
-## When to recommend declarative config
+Never replace a working control with a guessed implementation-specific YAML node. Some experimental
+namespaces may ignore unknown keys, so successful parsing or startup proves only that the file
+loaded. Re-run the behavioral check for every migrated guarantee—for sensitive-data controls, send
+a unique marker and prove it is absent from exported telemetry.
 
-Recommend it when the selected Go, Java, or JS runtime release supports the configuration
-features the project needs. Several implementations and activation APIs remain experimental,
-so verify the exact runtime and version first.
+## OllyGarden policy
 
-For .NET and Python, fall back to environment variables or programmatic setup — declarative
-config is still in development. To check the current per-language status, fetch the SDK
-compatibility matrix listed in the `otel-declarative-config` reference skill's Sources of Truth.
+Apply these rules after the runtime gate:
 
-## Common Patterns
+### One configuration model
 
-These patterns describe the **shape** of a correct config. For exact field names and
-exporter syntax, fetch `examples/otel-sdk-config.yaml` (see the `otel-declarative-config`
-reference skill's Sources of Truth) — those details vary by schema version.
+- Keep SDK settings in the file. Do not assume independent SDK-setting `OTEL_*` variables merge
+  with file mode; exact precedence and automatic loading are runtime-specific.
+- Preserve standard deployment inputs through explicit substitution when required:
+  `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, and `OTEL_EXPORTER_OTLP_*`. Do not invent
+  project-specific replacements for values already covered by those contracts.
+- Keep secrets external and reference them through supported substitution. Never commit a secret.
 
-### Resource attributes
+### Resource identity without clobbering deployment values
 
-Every config MUST set these. They identify the service across all signals; without them
-telemetry reports as `unknown_service` and cannot be grouped or owned.
+- Ensure a stable `service.name`; use `service.namespace` only when the organization has a
+  meaningful namespace. `service.owner.url` is not a universal OpenTelemetry requirement.
+- Let the relevant language setup skill decide its lean resource set. Do not copy a generic list
+  over a language-specific policy.
+- Treat version and environment as deployment/build values. Never duplicate a deploy-varying key
+  in a higher-precedence static block where it can overwrite the operator's value.
+- Never hardcode one `service.instance.id` for every replica. Generate or inject a per-process
+  value when the selected SDK does not provide one.
+- Do not hardcode SDK-, process-, host-, container-, or Kubernetes-detected attributes.
 
-| Attribute | Source | How |
-|---|---|---|
-| `service.name` | author-time, stable | `${OTEL_SERVICE_NAME:-<literal>}` — literal fallback, standard variable can override |
-| `service.namespace` | author-time, stable | literal |
-| `service.owner.url` | author-time, stable | literal — the service's repository URL |
-| `service.version` | build-time, varies | `OTEL_RESOURCE_ATTRIBUTES` via `attributes_list` |
-| `deployment.environment.name` | deploy-time, varies | `OTEL_RESOURCE_ATTRIBUTES` via `attributes_list` |
+### Sampling and suppression
 
-```yaml
-resource:
-  attributes:
-    # Static — known at author time; the standard variable still wins when set
-    - name: service.name
-      value: "${OTEL_SERVICE_NAME:-checkout-service}"
-    - name: service.namespace
-      value: "payments"
-    - name: service.owner.url
-      value: "https://github.com/acme/checkout-service"
-  # Deploy-varying attributes arrive through the STANDARD variable, e.g.
-  #   OTEL_RESOURCE_ATTRIBUTES=service.version=1.4.2,deployment.environment.name=production
-  attributes_list: ${OTEL_RESOURCE_ATTRIBUTES}
-```
+- Preserve upstream sampling decisions with parent-based behavior. Verify the exact sampler shape
+  and support in the selected runtime; never emit composite or rule-routing YAML from memory.
+- Do not default production to full sampling—or silently choose any ratio—when the instrumentation
+  plan or user has not supplied a policy.
+- Endpoints marked excluded by the instrumentation plan must not produce exported spans. Choose a
+  mechanism supported by the exact runtime/version and prove it with probe traffic. Leave the
+  mechanism as an explicit gap when support is absent.
 
-**Rules:**
+### Production export
 
-- **Static values** (`service.namespace`, `service.owner.url`, and the `service.name`
-  fallback) are hardcoded literals — they are stable per service and must never silently
-  degrade when a variable is missing.
-- **Deploy-varying values** (`service.version`, `deployment.environment.name`, ...) come
-  through the **standard** `OTEL_RESOURCE_ATTRIBUTES` variable into `attributes_list`. Do
-  NOT invent custom environment variables (`SERVICE_VERSION`,
-  `DEPLOYMENT_ENVIRONMENT_NAME`, ...) for values the standard variables already express —
-  the standard variable is the contract every OTel-aware deployment layer, operator, and
-  test harness already speaks. A declarative file ignores the environment unless it
-  references it, so omitting `attributes_list: ${OTEL_RESOURCE_ATTRIBUTES}` silently
-  breaks that contract.
-- **Precedence:** entries under `attributes` override `attributes_list`. Never duplicate
-  a deploy-varying key under `attributes` — a hardcoded
-  `deployment.environment.name: development` clobbers the operator's real environment and
-  misfiles every signal the service emits.
-- **The env vars are a contract.** `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES`, and
-  `OTEL_EXPORTER_OTLP_*` must be wired into the runtime (CI build arg, container env,
-  k8s manifest). That wiring is the deployment layer's responsibility, not this config
-  file's — but the config MUST reference the standard variables so they keep working.
-- **Do NOT hardcode `service.instance.id`.** Generate or inject a unique value per process when
-  the selected SDK does not do so automatically. A shared literal makes every replica report
-  the same id and corrupts per-instance metrics.
-- **Do NOT set `telemetry.sdk.*`, host, container, k8s, or process attributes.** Resource
-  detectors populate these automatically. Hardcoding produces wrong data.
+- Prefer batch processing in production; synchronous/simple export is for narrow test scenarios.
+- Keep exporter endpoints and headers externally configurable through the verified file model.
 
-### One config file, vary with env vars
+## Review output
 
-```yaml
-tracer_provider:
-  sampler:
-    parent_based:
-      root:
-        trace_id_ratio_based:
-          ratio: ${SAMPLE_RATE:-1.0}
-```
+Return only the applicable findings; do not introduce resource, sampling, exporter, or other
+rewiring that the request did not put in scope. For unresolved versioned facts, name
+`otel-declarative-config` and the exact relevant language/setup skill rather than citing vague
+"upstream docs."
 
-### Secrets via env var substitution
+When applicable, report:
 
-```yaml
-# Inside an exporter block (exact field names: see canonical example)
-headers:
-  - name: api-key
-    value: "${API_KEY}"
-endpoint: "${OTEL_ENDPOINT}"
-```
+1. Runtime/version and support evidence consulted.
+2. Existing code guarantees and whether each stays, moves, or remains unresolved.
+3. Policy findings: configuration model, resources, sampling/suppression, secrets, and batching.
+4. Exact upstream facts still needed; do not invent YAML to fill a gap.
+5. Behavioral verification for every changed guarantee, including markers and expected evidence.
 
-### Dropping health-check / probe spans
-
-When the instrumentation plan marks endpoints as `excluded` (health, readiness, and
-liveness probes — see `ollygarden-otel-instrumentation-planning`), the declarative
-mechanism is a **rule-based routing sampler that drops matching spans**. Do NOT reach for
-`OTEL_INSTRUMENTATION_*` exclude-path env vars as a second configuration channel unless the
-selected runtime explicitly documents how they combine with file configuration.
-
-Nest a rule-based routing sampler as the `root` of `parent_based`, keeping your normal
-ratio sampler as its fallback:
-
-```yaml
-tracer_provider:
-  sampler:
-    parent_based:
-      root:
-        rule_based_routing:
-          fallback_sampler:           # used when no rule matches
-            trace_id_ratio_based:
-              ratio: ${SAMPLE_RATE:-1.0}
-          span_kind: SERVER           # only inbound server spans
-          rules:
-            - action: DROP            # DROP or RECORD_AND_SAMPLE
-              attribute: url.path     # match the request path
-              pattern: /health.*    # align with the plan's probe path list (e.g /actuator /health /ready etc.)
-```
-
-**Rules:**
-
-- Nest inside `parent_based.root` so only root spans are evaluated — upstream sampling
-  decisions still propagate to downstream services.
-- `span_kind: SERVER` keeps client/producer/consumer spans untouched.
-- Align `pattern` with the exclusion path list in the instrumentation plan
-  (`/health`, `/healthz`, `/actuator/*`, etc.).
-- Availability is per-runtime — confirm the composite/rule-based sampler is supported by
-  the target SDK or agent, and fetch exact field names from the canonical example (see the
-  `otel-declarative-config` reference skill's Sources of Truth). For language-specific
-  availability and agent details, see the relevant `ollygarden-otel-*-setup` skill.
-
-## Anti-Patterns
-
-### Replacing code-level guarantees with invented YAML nodes
-
-```yaml
-# BAD: written to replace a SpanProcessor that stripped url.query. The leaf key
-# is missing its experimental /development suffix, so the runtime silently
-# ignores it — and the processor it "replaced" is gone. The PII ships.
-instrumentation/development:
-  general:
-    sanitization:
-      url:
-        sensitive_query_parameters:
-          - lastName
-```
-
-The schema is not a superset of what code can do (see *The file replaces properties and
-env vars — not code*). Before expressing a guarantee in YAML, confirm the exact node in
-the selected runtime's schema/source; keep the code component unless a supported
-equivalent exists; and re-verify the guarantee behaviorally after the switch.
-
-### Missing `parent_based` wrapper
-
-```yaml
-# BAD: ignores upstream sampling decisions, breaks distributed traces
-tracer_provider:
-  sampler:
-    trace_id_ratio_based:
-      ratio: 0.1
-
-# GOOD: respects parent sampling, applies ratio only to root spans
-tracer_provider:
-  sampler:
-    parent_based:
-      root:
-        trace_id_ratio_based:
-          ratio: 0.1
-```
-
-### Using `simple` processor in production
-
-```yaml
-# BAD: exports synchronously, blocks the application
-tracer_provider:
-  processors:
-    - simple:
-        exporter: { ... }
-
-# GOOD: exports asynchronously in batches
-tracer_provider:
-  processors:
-    - batch:
-        exporter: { ... }
-```
-
-### Hardcoded secrets
-
-```yaml
-# BAD: secrets in version control
-headers:
-  - name: api-key
-    value: "NOT_A_REAL_CREDENTIAL"
-```
-
-### Mixing env vars and config file
-
-```bash
-# BAD: assuming OTEL_* knobs merge predictably with a config file.
-export OTEL_CONFIG_FILE="/app/otel.yaml"
-export OTEL_TRACES_SAMPLER="always_off"              # precedence varies by runtime
-export OTEL_INSTRUMENTATION_HTTP_EXCLUDE_PATTERNS="" # do not assume this merges with the file
-```
-
-Configuration precedence and automatic file loading are runtime-specific. Do not mix an
-`OTEL_CONFIG_FILE` deployment with separate SDK-setting `OTEL_*` variables unless the selected
-runtime documents that combination. Keep SDK settings in the config model; reserve environment
-variables for `${VAR}` substitution inside it. Health-check exclusion becomes the
-`rule_based_routing` sampler above when that sampler is supported, not a second configuration
-channel.
-
-## Cross-References
-
-- Reference: `otel-declarative-config` skill — schema sources of truth, env-var substitution, configuration precedence.
-- Language conventions: `ollygarden-otel-go-setup`, `ollygarden-otel-java-setup`, `ollygarden-otel-js-setup`.
+A file that parses with no errors is not a completed migration.

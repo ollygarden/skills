@@ -1,0 +1,12 @@
+file_format: "1.0"
+instrumentation/development:
+  general:
+    sanitization:
+      url:
+        sensitive_query_parameters: [lastName]
+tracer_provider:
+  processors:
+    - batch:
+        exporter:
+          otlp:
+            endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}

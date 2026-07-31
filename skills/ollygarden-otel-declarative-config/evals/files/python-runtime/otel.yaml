@@ -1,0 +1,10 @@
+file_format: "1.1"
+resource:
+  attributes:
+    - name: service.name
+      value: ${OTEL_SERVICE_NAME:-orders}
+    - name: deployment.environment.name
+      value: development
+    - name: service.owner.url
+      value: https://example.invalid/orders
+  attributes_list: ${OTEL_RESOURCE_ATTRIBUTES}

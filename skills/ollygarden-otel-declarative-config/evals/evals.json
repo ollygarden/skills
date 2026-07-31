@@ -1,0 +1,56 @@
+{
+  "skill_name": "ollygarden-otel-declarative-config",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review the attached Java migration. The team moved every telemetry setting into otel.yaml and deleted the custom SpanProcessor because the file boots cleanly. Identify what must change and how to prove the migration preserved behavior; don't edit files.",
+      "expected_output": "A migration review that retains the code-level query sanitizer unless the exact runtime has a verified equivalent and requires marker-based behavioral verification.",
+      "files": [
+        "evals/files/java-migration/src/Telemetry.java",
+        "evals/files/java-migration/otel.yaml"
+      ],
+      "expectations": [
+        "Inventories the code-registered QuerySanitizingSpanProcessor as a behavioral guarantee rather than assuming YAML replaces arbitrary code.",
+        "Rejects the invented sanitization node unless the exact Java runtime/version schema and implementation prove an equivalent exists.",
+        "Keeps or restores the code processor when no verified equivalent is available and does not broaden the task into unrelated rewiring.",
+        "Explains that successful parsing or startup does not prove that sensitive query values are removed.",
+        "Requires a marker-value request and inspection of exported telemetry to prove the marker is absent after migration.",
+        "Routes exact activation, file-format, schema, and runtime-support facts to otel-declarative-config and the Java setup skill rather than inventing them."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Can this Python 1.44 service use declarative OpenTelemetry config now? Review the attached requirements and resource block against OllyGarden's conventions. We want standard deployment overrides to keep working and do not want made-up mandatory attributes.",
+      "expected_output": "A current, runtime-qualified recommendation that recognizes experimental released Python support, preserves standard environment substitution, and avoids universal custom-resource requirements.",
+      "files": [
+        "evals/files/python-runtime/requirements.txt",
+        "evals/files/python-runtime/otel.yaml"
+      ],
+      "expectations": [
+        "Recognizes that Python 1.44 has released experimental declarative configuration support and does not categorically force an env-only or programmatic fallback.",
+        "Names the experimental opentelemetry-configuration package or the compatibility alias and asks the upstream Python/declarative sources for exact activation and schema details.",
+        "Treats file config as authoritative and preserves OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES through explicit substitution rather than assuming independent SDK-setting env vars merge.",
+        "Flags the hardcoded deployment.environment.name because it can override the deployment-provided value.",
+        "Does not claim service.owner.url is an OpenTelemetry-mandated attribute or require it in every config.",
+        "Does not hardcode a shared service.instance.id and keeps volatile runtime support facts out of OllyGarden policy."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Review this Node service's proposed production otel.yaml. Product only said to suppress /healthz; nobody chose a sampling ratio yet. Keep upstream trace decisions intact, prevent secret leakage, and don't assume experimental sampler support. Give recommendations, not edits.",
+      "expected_output": "A runtime-qualified review that refuses an unapproved full-sampling default, preserves parent decisions, externalizes secrets, and avoids generic unsupported sampler YAML.",
+      "files": [
+        "evals/files/node-health/package.json",
+        "evals/files/node-health/otel.yaml"
+      ],
+      "expectations": [
+        "Does not accept SAMPLE_RATE defaulting to 1.0 or silently choose another production sampling commitment.",
+        "Requires parent-based handling so upstream sampling decisions remain authoritative.",
+        "Does not emit or endorse a generic rule_based_routing sampler shape until the exact Node package/version proves support and field names.",
+        "Keeps /healthz suppression as an outcome to verify with probe traffic and allows an honest unresolved mechanism when runtime support is absent.",
+        "Rejects the hardcoded API key and requires secret substitution or another external secret source.",
+        "Prefers batch over simple processing in production and routes exact YAML/schema facts upstream."
+      ]
+    }
+  ]
+}
