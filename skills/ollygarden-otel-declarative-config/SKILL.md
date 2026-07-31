@@ -20,12 +20,10 @@ Before recommending, reviewing, or generating a file:
 3. Prefer declarative config only when that support is adequate and the user accepts any
    experimental dependency. Otherwise preserve the current env-var or programmatic setup.
 
-Do not maintain a language-support table here. A former blanket Python fallback is obsolete:
-Python 1.44 introduced released experimental file configuration through the
-`opentelemetry-configuration` package; `opentelemetry-sdk[file-configuration]` remains a
-compatibility alias as of 2026-07. The upstream Python and declarative skills must still supply
-current package, activation, and schema details. Do not recommend declarative YAML for .NET until
-its upstream skill reports released support.
+Do not maintain a language-support table here or apply a blanket Python fallback. Ask
+`otel-declarative-config` and `otel-python` for current Python package, activation, schema, and
+support details. Do not recommend declarative YAML for .NET until its upstream skill reports
+released support.
 
 ## Migration gate: settings are not arbitrary code
 

@@ -21,14 +21,14 @@
     {
       "id": 2,
       "prompt": "Can this Python 1.44 service use declarative OpenTelemetry config now? Review the attached requirements and resource block against OllyGarden's conventions. We want standard deployment overrides to keep working and do not want made-up mandatory attributes.",
-      "expected_output": "A current, runtime-qualified recommendation that recognizes experimental released Python support, preserves standard environment substitution, and avoids universal custom-resource requirements.",
+      "expected_output": "A runtime-qualified recommendation that delegates current Python support details upstream, preserves standard environment substitution, and avoids universal custom-resource requirements.",
       "files": [
         "evals/files/python-runtime/requirements.txt",
         "evals/files/python-runtime/otel.yaml"
       ],
       "expectations": [
-        "Recognizes that Python 1.44 has released experimental declarative configuration support and does not categorically force an env-only or programmatic fallback.",
-        "Names the experimental opentelemetry-configuration package or the compatibility alias and asks the upstream Python/declarative sources for exact activation and schema details.",
+        "Does not categorically force an env-only or programmatic Python fallback and requires current support to be verified upstream.",
+        "Names otel-declarative-config and otel-python as the owners of current Python package, activation, schema, and support details.",
         "Treats file config as authoritative and preserves OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES through explicit substitution rather than assuming independent SDK-setting env vars merge.",
         "Flags the hardcoded deployment.environment.name because it can override the deployment-provided value.",
         "Does not claim service.owner.url is an OpenTelemetry-mandated attribute or require it in every config.",
