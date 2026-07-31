@@ -1,0 +1,20 @@
+file_format: "1.1"
+tracer_provider:
+  sampler:
+    rule_based_routing:
+      fallback_sampler:
+        trace_id_ratio_based:
+          ratio: ${SAMPLE_RATE:-1.0}
+      span_kind: SERVER
+      rules:
+        - action: DROP
+          attribute: url.path
+          pattern: /healthz
+  processors:
+    - simple:
+        exporter:
+          otlp:
+            endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+            headers:
+              - name: api-key
+                value: synthetic-hardcoded-key
