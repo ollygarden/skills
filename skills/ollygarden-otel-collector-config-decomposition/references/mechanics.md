@@ -17,11 +17,15 @@ otelcol-contrib \
 
 Maps merge by key and later conflicts win. This lets distinct
 `service.pipelines.traces`, `.metrics`, and `.logs` entries reassemble under one `service` map.
-Avoid empty or null map stubs in later files: they can remove earlier values.
+Avoid null map stubs such as `processors:` in later files: they remove earlier values. Use
+`processors: {}` for an intentional empty map, or omit the key.
 
-**Sequences are replaced, not combined.** A later `processors: [a, b]` replaces an earlier
-`processors: [a, c, b]`. Keep every pipeline's `receivers`, `processors`, and `exporters` sequence
-whole in one file. Processor order must remain unchanged.
+**By default, sequences are replaced, not combined.** A later `processors: [a, b]` replaces an
+earlier `processors: [a, c, b]`. The experimental `confmap.enableMergeAppendOption` gate changes
+that behavior only for `service.extensions` and pipeline `receivers` and `exporters`; pipeline
+`processors` still replace. Keep every pipeline's ordered sequences whole in one file. Record the
+exact feature-gate set and configuration URIs rather than assuming append behavior. Processor
+order must remain unchanged.
 
 ## Provider references
 
@@ -55,5 +59,6 @@ Custom OCB distributions must include every provider used by the config. Consult
 for the matching provider modules and versions for the pinned build rather than copying a version
 from this reference.
 
-Nested fragments are resolved from raw bytes, including comments. Keep literal provider tokens out
-of comments in fragments to avoid accidental or recursive expansion.
+The built-in file provider parses included content as YAML before resolver expansion, so YAML
+comments are discarded. Provider expressions in parsed configuration values are still resolved;
+preserve those expressions verbatim during a pure refactor.

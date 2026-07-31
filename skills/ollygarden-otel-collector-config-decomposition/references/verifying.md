@@ -1,14 +1,16 @@
 # Verify behavior-preserving decomposition
 
 A pure decomposition must pass merged validation and resolved equivalence. Captured 2026-07:
-`print-config` remains version-sensitive, so confirm the pinned distribution supports it with
-`otel-collector`.
+`print-config` availability and gate requirements are version-sensitive, so confirm the pinned
+distribution supports it with `otel-collector`. Collector v0.156.0 removed the stabilized
+`otelcol.printInitialConfig` gate; do not pass that historical gate to v0.156.0.
 
 ## 1. Freeze inputs
 
-Record the exact Collector distribution and version, configuration source order, working directory,
-and required environment values. Use the same binary, environment, validation mode, and provider
-inputs for the monolith and split. Do not substitute production secrets into review artifacts.
+Record the exact Collector distribution and version, configuration source order and URIs,
+feature-gate set, working directory, and required environment values. Use the same binary,
+environment, validation mode, and provider inputs for the monolith and split. Do not substitute
+production secrets into review artifacts.
 
 ## 2. Validate the complete configurations
 
@@ -43,7 +45,7 @@ otelcol-contrib print-config --mode=redacted \
   --config=file:logs.yaml > split.resolved.yaml
 ```
 
-If the pinned distribution lacks this experimental command, use its supported configuration
+If the pinned distribution lacks this command, use its supported configuration
 resolver; do not claim equivalence from raw concatenation or key inspection.
 
 Parse and recursively compare `original.resolved.yaml` with `split.resolved.yaml`:

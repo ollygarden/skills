@@ -50,8 +50,11 @@ collector/
 ```
 
 Load the base first and exactly one environment file last. Keep overlays small and record their
-order. A sequence override must restate the entire intended sequence; adding a debug exporter, for
-example, requires the full resulting pipeline exporter list.
+order, exact configuration URIs, and feature-gate set. Under the default merge behavior, a sequence
+override must restate the entire intended sequence; adding a debug exporter, for example, requires
+the full resulting pipeline exporter list. If `confmap.enableMergeAppendOption` is explicitly
+enabled, only `service.extensions` and pipeline receivers and exporters append; processors still
+replace.
 
 ## Nested inclusion
 

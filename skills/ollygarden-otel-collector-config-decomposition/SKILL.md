@@ -20,7 +20,8 @@ Use upstream skills for facts that change independently:
 
 ## Workflow
 
-1. Inspect the monolith, environment variants, ownership, and deployment command.
+1. Inspect the monolith, environment variants, ownership, and deployment command. Record the exact
+   Collector distribution and version, feature-gate set, and ordered configuration URIs.
 2. Count the pressures below. If fewer than two are meaningful, stop without changing files.
 3. If warranted, choose the split from actual change and ownership boundaries.
 4. Read [`references/mechanics.md`](references/mechanics.md), then write the split directly unless
@@ -60,13 +61,16 @@ invent an ownership model to justify a pattern.
 
 ## Non-negotiable preservation rules
 
-- Keep each `receivers`, `processors`, and `exporters` pipeline sequence in one file. Sequences are
-  replaced, not combined; processor order is behavior.
+- Keep each pipeline's `receivers`, `processors`, and `exporters` sequence in one file. Under the
+  default merge behavior, later sequences replace earlier ones. Even when
+  `confmap.enableMergeAppendOption` is enabled, only `service.extensions` and pipeline receivers
+  and exporters append; processors still replace, and processor order is behavior.
 - Define shared components once. Distinct `service.pipelines.<name>` map entries may live with their
   owning signal.
 - Preserve component IDs, values, provider expressions, extensions, connectors, service telemetry,
   and pipeline membership unless the user separately authorized a behavior change.
-- Treat environment overlays as ordered inputs and record the order.
+- Treat environment overlays as ordered inputs. Record their order, exact configuration URIs, and
+  feature-gate set.
 - Validate the complete ordered source set, never a fragment in isolation.
 - Compare fully resolved output from the monolith with fully resolved output from the split under
   the same pinned Collector and environment. Raw YAML versus resolved YAML is not an equivalence
