@@ -1,0 +1,13 @@
+$ ollygarden auth list-contexts
+NAME       API URL
+default    https://api.ollygarden.cloud
+acme-prod  https://api.ollygarden.cloud
+
+$ ollygarden auth status
+Authenticated (context: default)
+
+$ ollygarden insights get ins_01 --json
+{"data":{"id":"ins_01","service_id":"svc_stage_old","service_name":"checkout","service_version":"1.8.0","service_environment":"staging","status":"active"}}
+
+$ ollygarden services search "checkout" --json
+{"data":[{"id":"svc_stage_old","name":"checkout","version":"1.8.0","environment":"staging","last_seen_at":"2026-07-31T09:00:00Z"},{"id":"svc_prod_new","name":"checkout","version":"2.4.1","environment":"production","last_seen_at":"2026-07-30T16:00:00Z"}]}
