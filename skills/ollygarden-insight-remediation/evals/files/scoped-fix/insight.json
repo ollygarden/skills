@@ -1,7 +1,9 @@
 {
   "data": {
     "id": "ins_03",
+    "service_id": "svc_cart_prod",
     "service_name": "cart-api",
+    "service_version": "3.2.1",
     "service_environment": "production",
     "status": "active",
     "attributes": {"span_name": "GET /healthz", "sample_count": 4200},
