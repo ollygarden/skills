@@ -3,7 +3,9 @@
 Use this only after the user approves the exact image reference. Substitute the reviewed harness
 and telemetrygen command; do not execute placeholders.
 
-```sh
+```bash
+set -euo pipefail
+
 if command -v podman >/dev/null 2>&1; then
   OTEL_TEST_RUNTIME=podman
 elif command -v docker >/dev/null 2>&1; then
@@ -31,7 +33,10 @@ cleanup() {
 trap cleanup EXIT
 
 OTEL_TEST_USER_ARGS="--user $(id -u):$(id -g)"
-# For rootless Podman, set OTEL_TEST_USER_ARGS= if explicit UID mapping prevents writes.
+if [ "$OTEL_TEST_RUNTIME" = podman ] && \
+   [ "$(podman info --format '{{.Host.Security.Rootless}}' 2>/dev/null)" = true ]; then
+  OTEL_TEST_USER_ARGS=
+fi
 
 "$OTEL_TEST_RUNTIME" run -d --rm --name "$OTEL_TEST_NAME" \
   -p 127.0.0.1:4317:4317 \
