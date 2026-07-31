@@ -21,8 +21,9 @@
       "files": ["evals/files/context-script/state.json"],
       "expectations": [
         "States that OLLYGARDEN_API_KEY wins over the key in --context prod-eu, while the explicit --api-url wins independently for the API URL.",
+        "Does not print or reproduce the value of OLLYGARDEN_API_KEY or any saved api-key in the snippet or explanation.",
         "Uses --json and preserves the ollygarden process exit status before jq parsing instead of relying on a pipeline that can mask failure.",
-        "Uses jq -e or an equivalent failing parse and validates that the extracted service ID has the expected UUID-like shape before reuse.",
+        "Uses jq -e or an equivalent failing parse and validates that the extracted service ID has the structural 8-4-4-4-12 hexadecimal UUID shape before reuse.",
         "Does not run auth login, auth use-context, install software, contact a service, or otherwise mutate local state.",
         "Recognizes exit code 7 as a local configuration failure and keeps stdout for data and stderr for diagnostics."
       ]

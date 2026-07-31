@@ -93,7 +93,8 @@ program with a more complex equivalent.
 
 ```bash
 if payload=$(ollygarden --context "$context" --api-url "$api_url" services search "$query" --json); then
-  count=$(jq -er '.data | length' <<<"$payload") || exit 2
+  count=$(jq -er 'if (.data | type) == "array" then (.data | length) else error("invalid data") end' \
+    <<<"$payload") || exit 2
 else
   rc=$?
   printf 'ollygarden failed (exit %s)\n' "$rc" >&2
@@ -102,7 +103,9 @@ fi
 
 (( count == 1 )) || { echo 'select one service explicitly' >&2; exit 2; }
 service_id=$(jq -er '.data[0].id' <<<"$payload") || exit 2
-[[ "$service_id" =~ ^[0-9a-fA-F-]{36}$ ]] || { echo 'invalid service id' >&2; exit 2; }
+[[ "$service_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] || {
+  echo 'invalid service id' >&2; exit 2;
+}
 ```
 
 Exit codes: `0` success, `1` general/network, `2` usage/validation, `3` auth, `4` not found,
