@@ -117,7 +117,7 @@ When the last context is removed, the config file is deleted.
 
 ### `analytics services [flags]`
 
-Per-service analytics roll-up. Inspect raw shape with `--json | jq` —
+Per-service analytics roll-up. Request `--json`, preserve the CLI status, then inspect `.data[0]` —
 field names vary by tier and may evolve. May return an `UPSTREAM_ERROR`
 when the analytics backend is unavailable; check `meta.trace_id` and
 exit code (`6` for server error).
@@ -127,7 +127,7 @@ exit code (`6` for server error).
 | `--limit <n>` | 1-100, default 50. |
 
 ```bash
-ollygarden analytics services --json | jq '.data[0]'   # discover field names
+ollygarden analytics services --json
 ```
 
 ---
@@ -185,11 +185,11 @@ returns `data: {tier: {name, features}, score: {value, updated_at}}` —
 no top-level `name` field.
 
 ```bash
-ollygarden organization --json \
-  | jq '{tier: .data.tier.name, score: .data.score.value, features: .data.tier.features}'
+ollygarden organization --json
 ```
 
-Use this as a quick "which org am I authed against" check.
+Inspect `.data.tier`, `.data.score`, and `.data.tier.features`. This does not establish organization
+identity because the response has no organization name.
 
 ---
 
