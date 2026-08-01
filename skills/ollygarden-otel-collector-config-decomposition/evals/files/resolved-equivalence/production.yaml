@@ -1,0 +1,10 @@
+exporters:
+  otlp:
+    endpoint: ${env:BACKEND_ENDPOINT}
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [filter/health, batch]
+      exporters: [otlp]

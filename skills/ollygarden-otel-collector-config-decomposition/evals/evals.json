@@ -1,0 +1,51 @@
+{
+  "skill_name": "ollygarden-otel-collector-config-decomposition",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review the attached Collector config and decide whether to split it. One engineer owns it, there are no environment variants, and we prefer fewer files unless decomposition has a concrete payoff. Do not edit anything; return the decision report only.",
+      "expected_output": "A deliberate no-op that leaves the small single-pipeline config unchanged and reports why decomposition would add needless indirection.",
+      "files": ["evals/files/deliberate-no-op/collector.yaml"],
+      "expectations": [
+        "Decides to leave the config as one file and does not propose or invent split files.",
+        "Bases the no-op on the small single pipeline, single owner, and absence of environment drift rather than claiming decomposition is always beneficial.",
+        "Reports Decision, Why, Strategy, Files, and Verification, with strategy and verification marked not applicable and files unchanged.",
+        "Does not mutate the fixture or claim to have run Collector validation."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Plan an exact decomposition for the attached monolith without editing it. The platform team owns shared ingress and exporters; separate tracing, metrics, and logging teams own their signal-specific processing. Preserve behavior and show which top-level blocks and pipeline entries belong in each output file.",
+      "expected_output": "A by-signal split with shared components in common.yaml, signal-owned components and complete ordered pipeline arrays in their signal files, plus an ordered merged-set verification plan.",
+      "files": ["evals/files/ownership-boundaries/collector.yaml"],
+      "expectations": [
+        "Chooses a by-signal decomposition because the stated ownership boundaries align with traces, metrics, and logs, rather than splitting mechanically by component type.",
+        "Places the shared otlp receiver, memory_limiter and batch processors, otlp exporter, health_check extension, and service telemetry in common.yaml exactly once.",
+        "Places tail_sampling and the entire traces pipeline in traces.yaml; filter/metrics and the entire metrics pipeline in metrics.yaml; filter/logs and the entire logs pipeline in logs.yaml.",
+        "Keeps every receivers, processors, and exporters array intact in exactly one file and preserves the original processor order for all three pipelines.",
+        "Plans validation of the complete ordered file set and a fully resolved structural equivalence comparison rather than validating fragments or comparing only key sets.",
+        "Reports Decision, Why, Strategy, Files, and Verification and does not claim commands were executed."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Review the attached base and production overlay decomposition. Explain the exact proof needed before calling it behavior-equivalent to the original monolith. The endpoint comes from BACKEND_ENDPOINT, and we also need to know whether the filter still drops health spans. Do not execute the Collector or change files.",
+      "expected_output": "A same-binary, same-environment comparison of redacted fully resolved monolith and merged outputs, separate confirmation of redacted secret sources, ordered-array checks, merged validation, and a handoff for filter behavior proof.",
+      "files": [
+        "evals/files/resolved-equivalence/monolith.yaml",
+        "evals/files/resolved-equivalence/base.yaml",
+        "evals/files/resolved-equivalence/production.yaml"
+      ],
+      "expectations": [
+        "Requires the same pinned Collector distribution/version and the same explicit BACKEND_ENDPOINT value for both monolith and split resolution.",
+        "Runs validate against the complete ordered base.yaml then production.yaml set, not either fragment alone.",
+        "Uses print-config or the pinned distribution's equivalent on both the monolith and the merged split set, in default redacted mode, then compares those two fully resolved outputs.",
+        "Requires recursive value equality, treats map order as irrelevant, and checks pipeline arrays including processor order rather than comparing only key sets.",
+        "Does not compare resolved split output directly to raw monolith YAML or require unredacted output that could expose secrets.",
+        "Freezes the same BACKEND_TOKEN input for both forms and separately confirms that the redacted authorization field retains the ${env:BACKEND_TOKEN} source without revealing its value.",
+        "States that structural equivalence and validate do not prove filter behavior and hands that proof to ollygarden-otel-collector-config-validation with matching and non-matching telemetry.",
+        "Does not claim any validation, print, behavioral test, or environment resolution was executed."
+      ]
+    }
+  ]
+}
