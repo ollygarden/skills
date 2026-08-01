@@ -12,7 +12,7 @@ cluster Deployment for `tail_sampling`, `load_balancing`, `k8s_cluster`, and `k8
 
 This repository owns OllyGarden's decisions, not component facts. Consult `otel-collector` for
 current component keys, defaults, and stability; `otel-ottl` for syntax; and the relevant
-`ollygarden-otel-*` setup skill for source-side fixes.
+public language setup skill or `ollygarden-otel-auto-instrumentation` for source-side fixes.
 
 ## Non-negotiable pipeline contract
 
@@ -45,35 +45,30 @@ Metric cost is series count × datapoints per minute. The references implement t
 - Scrape each pod only from the agent on its node using
   `field: spec.nodeName=${env:K8S_NODE_NAME}`; use a separate slow scrape for expensive endpoints
   and discard terminal pods.
-- Remove Prometheus-generated `service.name` and `service.instance.id` when real Kubernetes
-  resource identity is available, and filter to monitored namespaces.
+- Filter to monitored namespaces.
 
 The preferred DPM pattern is separate receivers over disjoint subsets. For SDK-set OTLP cadence or
-receivers without a partition knob, defer the `routing` connector + `interval` processor fallback
-to `remediation-metric-dpm-reduction`; unmatched passthrough and empty emissions make that pattern
-unsafe to improvise here.
+receivers without a partition knob, consult the public `otel-collector` `routing` connector and
+`interval` processor references. Preserve unmatched passthrough and account for empty emissions.
 
 ## Logs: cap and scope
 
 - Cap individual pod-log records (`max_log_size: 100KiB`) and exclude the collector's own logs.
 - Drop low-value severities only after structured records have a usable `severity_number`.
-- Deduplicate only known-chatty services. Immediately before scoped `logdedup`, remove
+- Deduplicate only known-chatty services. Immediately before scoped `log_dedup`, remove
   `log.file.path` and `log.file.record_number` under the same condition or those changing offsets
   defeat the hash. The shipped YAML deliberately does not enable dedup without a service-specific
-  scope; consult the `otel-collector` `logdedup` reference before adding it.
-- Convert high-volume access logs to metrics only through the validated
-  `remediation-access-log-to-metrics` workflow. Keep `batch` before its connector and confirm the
-  pinned distribution includes the required contrib component.
-- Fix telemetry values embedded in message text at the application with
-  `remediation-structured-logging-migration`, not brittle Collector regexes.
+  scope; consult the `otel-collector` `log_dedup` reference before adding it.
+- Fix telemetry values embedded in message text at the application rather than relying on brittle
+  Collector regexes.
 
 ## Traces: deterministic noise only
 
 - Drop probe spans using the bounded route/path/name patterns in `references/traces.yaml`; the
   filters cover current and legacy HTTP attributes plus framework handler names. Keep regexes
   anchored.
-- Prefer source-side suppression for static assets
-  (`remediation-nginx-static-asset-tracing`); use the Collector filter as a portable fallback.
+- Prefer source-side suppression for static assets (`ollygarden-otel-auto-instrumentation`); use
+  the Collector filter as a portable fallback.
 - Do not probabilistically head-sample at the agent for cost. Keep the agent lossless except for
   reviewed deterministic noise filters; whole-trace reduction requires gateway
   `tail_sampling` behind `load_balancing`.
@@ -113,7 +108,5 @@ version limits.
 
 - Component configuration and OTTL: `otel-collector`, `otel-ottl`.
 - Generic deep-merge mechanics: `ollygarden-otel-collector-config-decomposition`.
-- DPM reduction: `remediation-metric-dpm-reduction`.
-- Access logs to metrics: `remediation-access-log-to-metrics`.
-- Probe/static/source logging fixes: `remediation-java-agent-hygiene`,
-  `remediation-nginx-static-asset-tracing`, `remediation-structured-logging-migration`.
+- Source-side telemetry design and suppression: `ollygarden-otel-auto-instrumentation`,
+  `ollygarden-otel-manual-instrumentation`.

@@ -4,12 +4,6 @@
 # Merge: --config file:common.yaml --config file:logs.yaml
 # Component config -> `otel-collector` skill. OTTL syntax -> `otel-ottl` skill.
 #
-# High-volume HTTP access logs are cheaper as metrics: convert them with a
-# signaltometrics connector (http.server.request.duration histogram) and drop the
-# raw records, rather than shipping every request line. That pipeline is owned
-# end-to-end by the remediation-access-log-to-metrics skill — use it instead of
-# reimplementing it here.
-
 receivers:
   # --- Pod log collection -------------------------------------------------
   filelog:
@@ -41,10 +35,10 @@ processors:
         - 'severity_number < SEVERITY_NUMBER_INFO'
 
   # CUSTOMIZE: scoped log dedup is intentionally not enabled in this generic
-  # template. Before adding logdedup for a known-chatty service, conditionally
+  # template. Before adding log_dedup for a known-chatty service, conditionally
   # remove log.file.path and log.file.record_number immediately before it under
   # the same condition; changing offsets otherwise defeat dedup. Confirm the
-  # exact processor shape in the `otel-collector` logdedup reference.
+  # exact processor shape in the `otel-collector` log_dedup reference.
 
 service:
   pipelines:
