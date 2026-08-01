@@ -1,0 +1,34 @@
+{
+  "environment": {
+    "OLLYGARDEN_API_KEY": "configured-but-secret",
+    "OLLYGARDEN_CONTEXT": "staging",
+    "OLLYGARDEN_API_URL": "https://api.staging.ollygarden.cloud"
+  },
+  "requested_invocation": {
+    "context_flag": "prod-eu",
+    "api_url_flag": "https://api.internal.ollygarden.cloud",
+    "query": "checkout"
+  },
+  "saved_config": {
+    "current-context": "sandbox",
+    "contexts": {
+      "prod-eu": {
+        "api-url": "https://api.ollygarden.cloud",
+        "api-key": "saved-secret-not-to-be-printed"
+      },
+      "staging": {
+        "api-url": "https://api.staging.ollygarden.cloud",
+        "api-key": "another-saved-secret"
+      }
+    }
+  },
+  "exit_codes": {
+    "0": "success",
+    "2": "usage or validation",
+    "3": "authentication",
+    "4": "not found",
+    "5": "rate limited",
+    "6": "server",
+    "7": "local config"
+  }
+}
