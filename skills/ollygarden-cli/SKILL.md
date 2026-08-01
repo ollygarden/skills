@@ -73,9 +73,10 @@ needed for the requested resource inspection. Preflight is conditional, not a ri
 
 ## Resolve target and credentials
 
-Credential and URL selection are independent:
+Context, API-key, and URL selection are separate:
 
-- API key: `OLLYGARDEN_API_KEY` > `--context` > `OLLYGARDEN_CONTEXT` > saved `current-context`.
+- Context: `--context` > `OLLYGARDEN_CONTEXT` > saved `current-context`.
+- API key: `OLLYGARDEN_API_KEY` > key in the selected context.
 - API URL: `--api-url` > `OLLYGARDEN_API_URL` > selected context URL > built-in default.
 
 An environment API key therefore overrides the key stored in a named context. Before a sensitive or
@@ -88,24 +89,25 @@ Use `--json`; human tables may change. Preserve the CLI exit status before parsi
 `jq -e` so missing or malformed data also fails. Do not let a pipeline turn a failed CLI call into a
 successful script.
 
-Use this frozen search/extraction pattern. Change only the variable values; do not replace its jq
-program with a more complex equivalent.
+For a machine-readable single-result search, keep the script short while preserving the CLI status,
+response shape, and identifier gate:
 
 ```bash
-if payload=$(ollygarden --context "$context" --api-url "$api_url" services search "$query" --json); then
-  count=$(jq -er 'if (.data | type) == "array" then (.data | length) else error("invalid data") end' \
-    <<<"$payload") || exit 2
+if payload=$(ollygarden --context "$context" --api-url "$api_url" \
+    services search "$query" --json); then
+  :
 else
-  rc=$?
-  printf 'ollygarden failed (exit %s)\n' "$rc" >&2
-  exit "$rc"
+  rc=$?; printf 'ollygarden failed (exit %s)\n' "$rc" >&2; exit "$rc"
 fi
 
-(( count == 1 )) || { echo 'select one service explicitly' >&2; exit 2; }
-service_id=$(jq -er '.data[0].id' <<<"$payload") || exit 2
+service_id=$(jq -er '
+  select((.data | type) == "array" and (.data | length) == 1)
+  | .data[0].id | select(type == "string")
+' <<<"$payload") || { echo 'select one service explicitly' >&2; exit 2; }
 [[ "$service_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] || {
   echo 'invalid service id' >&2; exit 2;
 }
+jq -n --arg id "$service_id" '{id: $id}'
 ```
 
 Exit codes: `0` success, `1` general/network, `2` usage/validation, `3` auth, `4` not found,
