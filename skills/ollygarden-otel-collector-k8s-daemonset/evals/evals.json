@@ -9,8 +9,8 @@
       "expectations": [
         "Rejects probabilistic head sampling at the node agent as a cost-control strategy.",
         "Places tail_sampling behind load_balancing at the gateway tier where complete traces can be grouped.",
-        "Moves k8s_events and k8s_cluster to a once-per-cluster gateway or cluster Deployment rather than every DaemonSet replica.",
-        "Retains deterministic probe and static-asset filtering at the node when the patterns are bounded and reviewed.",
+        "Moves the fixture's k8s_events receiver to a once-per-cluster gateway or cluster Deployment rather than every DaemonSet replica.",
+        "Retains the fixture's deterministic probe filtering at the node when the pattern is bounded and reviewed.",
         "Does not execute, deploy, pull, or validate the attached configuration."
       ]
     },
@@ -21,7 +21,7 @@
       "files": ["evals/files/node-resource-safety/collector.yaml"],
       "expectations": [
         "Requires memory_limiter to be the first processor in every signal pipeline.",
-        "Requires k8sattributes filter.node_from_env_var to use K8S_NODE_NAME so each agent watches only its node.",
+        "Requires canonical k8s_attributes filter.node_from_env_var to use K8S_NODE_NAME so each agent watches only its node.",
         "Requires file_storage offsets to use host-backed persistent storage and explains that container-local storage loses offsets on pod recreation.",
         "Requires resource-value truncation to remain last among transforms.",
         "Does not infer node-local OTLP ingest from a 0.0.0.0 listener alone and requires the DaemonSet networking/routing topology to be verified."

@@ -19,12 +19,12 @@ public language setup skill or `ollygarden-otel-auto-instrumentation` for source
 Apply these to traces, metrics, and logs:
 
 1. Put `memory_limiter` first so backpressure happens before downstream buffering.
-2. Enrich with real identity; do not fabricate it. Scope `k8sattributes` to the local node with
+2. Enrich with real identity; do not fabricate it. Scope `k8s_attributes` to the local node with
    `filter.node_from_env_var: K8S_NODE_NAME`, disable the system detector's `host.name`, and verify
    detector order/`override` against the pinned Collector distribution.
 3. Put resource-value truncation last among transforms. Kubernetes metadata can otherwise inflate
    every record.
-4. Persist `filelog` offsets with `file_storage` on host-backed storage. Container-local storage
+4. Persist `file_log` offsets with `file_storage` on host-backed storage. Container-local storage
    loses offsets when the pod is recreated.
 
 The OTLP listener binding alone does not make ingest node-local. The DaemonSet deployment must
@@ -35,7 +35,7 @@ the agent/gateway boundary holds.
 
 Metric cost is series count × datapoints per minute. The references implement these decisions:
 
-- Curate `kubeletstats` and `hostmetrics`; prefer bounded utilization measurements over redundant
+- Curate `kubeletstats` and `host_metrics`; prefer bounded utilization measurements over redundant
   per-state series.
 - Split fast and slow groups into disjoint receiver instances. Keep container/pod/node metrics at
   20s, volume metrics at 60s, CPU/memory at 60s, and filesystem at 300s. Do not slow a single
@@ -101,7 +101,7 @@ Complete every gate below; a parser-only or single-fragment check is not verific
 3. Use sanitized positive and near-miss telemetry to prove each filter drops only its intended
    target. Never use production ingest/export endpoints for verification.
 
-Follow `references/validating.md` for the exact commands, disposable off-cluster overlay, and
+Follow `references/validating.md` for the merged commands, off-cluster failure classification, and
 version limits.
 
 ## Handoffs

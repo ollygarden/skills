@@ -1,17 +1,17 @@
 receivers:
-  filelog:
+  file_log:
     include: [/var/log/pods/*/*/*.log]
     include_file_path: true
     include_file_record_number: true
     include_file_name: true
 
 processors:
-  logdedup:
+  log_dedup:
     interval: 10s
 
 service:
   pipelines:
     logs:
-      receivers: [filelog]
-      processors: [memory_limiter, logdedup, batch]
+      receivers: [file_log]
+      processors: [memory_limiter, log_dedup, batch]
       exporters: [otlp]

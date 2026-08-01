@@ -55,7 +55,7 @@ receivers:
   # --- Host metrics -------------------------------------------------------
   # Pattern A again: filesystem capacity is near-static, so it goes to a 300s
   # instance while cpu/memory utilization stay at 60s.
-  hostmetrics/fast:
+  host_metrics/fast:
     collection_interval: 60s # 60s, not 10s — host metrics rarely need finer
     root_path: /hostfs
     scrapers:
@@ -70,7 +70,7 @@ receivers:
           system.memory.usage: {enabled: false}
           system.memory.utilization: {enabled: true}
 
-  hostmetrics/slow:
+  host_metrics/slow:
     collection_interval: 300s # filesystem capacity is near-static
     root_path: /hostfs
     scrapers:
@@ -146,11 +146,11 @@ processors:
 service:
   pipelines:
     metrics:
-      receivers: [otlp, kubeletstats/main, kubeletstats/volume, hostmetrics/fast, hostmetrics/slow, prometheus]
+      receivers: [otlp, kubeletstats/main, kubeletstats/volume, host_metrics/fast, host_metrics/slow, prometheus]
       processors:
         - memory_limiter
-        - k8sattributes
-        - resourcedetection
+        - k8s_attributes
+        - resource_detection
         - resource/clustername
         - filter/only_monitored_namespaces
         - filter/drop_static_volume_mounts

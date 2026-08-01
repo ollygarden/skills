@@ -34,13 +34,13 @@ Prometheus jobs. A successful command without this inspection does not prove the
 
 `validate` checks structure, component existence, and OTTL syntax, and also instantiates the
 pipeline. Several errors are pure **off-cluster** artifacts: cloud detectors in
-`resourcedetection` (e.g. `eks`) and `kubeletstats` `auth_type: serviceAccount` (it reads the
+`resource_detection` (e.g. `eks`) and `kubeletstats` `auth_type: serviceAccount` (it reads the
 SA CA cert at build time) fail because there is no Kubernetes API or service-account mount, and
-`hostmetrics` `root_path: /hostfs` needs the host mount. They disappear when the DaemonSet runs
+`host_metrics` `root_path: /hostfs` needs the host mount. They disappear when the DaemonSet runs
 in the cluster. A genuine config error (a bad OTTL statement, an unknown component, a misspelled
 key) surfaces during the same phase, so they can mask one: the build aborts at the *first*
 failure. To force the **whole** pipeline to build off-cluster—and thus compile every OTTL
-filter/transform downstream of `resourcedetection`—validate a throwaway overlay with the cloud
+filter/transform downstream of `resource_detection`—validate a throwaway overlay with the cloud
 detectors swapped for `[env]` and `kubeletstats` `auth_type: none`; a clean run then means all
 components instantiated and all OTTL compiled. (Validated this way on `otelcol-contrib` v0.155.0;
 re-run it against the pinned deployment version rather than treating that stamp as evergreen.)

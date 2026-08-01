@@ -6,7 +6,7 @@ processors:
   batch: {}
   memory_limiter:
     limit_mib: 256
-  k8sattributes:
+  k8s_attributes:
     auth_type: serviceAccount
   transform/truncate:
     trace_statements:
@@ -19,7 +19,7 @@ receivers:
     protocols:
       grpc:
         endpoint: 0.0.0.0:4317
-  filelog:
+  file_log:
     include: [/var/log/pods/*/*/*.log]
     storage: file_storage
 
@@ -28,5 +28,5 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch, k8sattributes, memory_limiter, transform/truncate]
+      processors: [batch, k8s_attributes, memory_limiter, transform/truncate]
       exporters: [otlp]

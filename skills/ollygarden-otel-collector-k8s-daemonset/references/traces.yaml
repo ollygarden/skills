@@ -1,7 +1,7 @@
 # Traces pipeline for the decomposed node-agent collector.
 # Self-contained for traces: trace-only processors plus service.pipelines.traces.
-# The otlp receiver and the shared processors (memory_limiter, k8sattributes,
-# resourcedetection, resource/clustername, transform/truncate_resources, batch)
+# The otlp receiver and the shared processors (memory_limiter, k8s_attributes,
+# resource_detection, resource/clustername, transform/truncate_resources, batch)
 # are defined in common.yaml. Merge: --config file:common.yaml --config file:traces.yaml
 # Component config -> `otel-collector` skill. OTTL syntax -> `otel-ottl` skill.
 
@@ -48,8 +48,8 @@ service:
       receivers: [otlp]
       processors:
         - memory_limiter
-        - k8sattributes
-        - resourcedetection
+        - k8s_attributes
+        - resource_detection
         - resource/clustername
         - filter/drop_probe_spans
         - filter/drop_static_assets

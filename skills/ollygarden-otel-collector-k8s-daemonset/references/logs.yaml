@@ -1,12 +1,12 @@
 # Logs pipeline for the decomposed node-agent collector.
-# Self-contained for logs: filelog receiver + log-only processors + service.pipelines.logs.
+# Self-contained for logs: file_log receiver + log-only processors + service.pipelines.logs.
 # Shared otlp receiver / processors live in common.yaml.
 # Merge: --config file:common.yaml --config file:logs.yaml
 # Component config -> `otel-collector` skill. OTTL syntax -> `otel-ottl` skill.
 #
 receivers:
   # --- Pod log collection -------------------------------------------------
-  filelog:
+  file_log:
     include: [/var/log/pods/*/*/*.log]
     exclude:
       # Never ingest the collector's own logs — that is a feedback loop.
@@ -43,11 +43,11 @@ processors:
 service:
   pipelines:
     logs:
-      receivers: [otlp, filelog]
+      receivers: [otlp, file_log]
       processors:
         - memory_limiter
-        - k8sattributes
-        - resourcedetection
+        - k8s_attributes
+        - resource_detection
         - resource/clustername
         - filter/drop_low_severity
         - transform/truncate_resources
