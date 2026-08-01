@@ -7,7 +7,7 @@
 # Signal-specific receivers/processors live in traces.yaml / metrics.yaml / logs.yaml.
 
 extensions:
-  # Durable filelog offsets survive restarts, so pod logs are not re-read from
+  # Durable file_log offsets survive restarts, so pod logs are not re-read from
   # the start after a collector restart (avoids duplicate log records).
   # CUSTOMIZE: back this directory with a hostPath/PVC in the DaemonSet. If it
   # lives only on the container filesystem, a pod recreate loses the offsets and
@@ -38,7 +38,7 @@ processors:
 
   # Cloud + k8s resource detection. host.name disabled in the system detector
   # so a pod name does not masquerade as the node hostname.
-  resourcedetection:
+  resource_detection:
     detectors: [eks, ecs, ec2, gcp, aks, azure, k8snode, system]
     timeout: 2s
     override: false
@@ -49,7 +49,7 @@ processors:
   # K8s metadata enrichment. Pod labels/annotations are intentionally NOT
   # extracted wholesale — each becomes a resource attribute and they are the
   # usual source of resource-attribute bloat. Add specific ones deliberately.
-  k8sattributes:
+  k8s_attributes:
     auth_type: serviceAccount
     passthrough: false
     # Scope the informer to THIS node's pods. On a DaemonSet this is the

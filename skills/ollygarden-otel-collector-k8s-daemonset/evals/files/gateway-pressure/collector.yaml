@@ -1,0 +1,26 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+  k8s_events:
+
+processors:
+  memory_limiter:
+    limit_mib: 256
+  probabilistic_sampler:
+    sampling_percentage: 10
+  filter/noise:
+    traces:
+      span:
+        - 'attributes["http.route"] == "/healthz"'
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/noise, probabilistic_sampler]
+      exporters: [otlp]
+    logs/events:
+      receivers: [k8s_events]
+      processors: [memory_limiter]
+      exporters: [otlp]

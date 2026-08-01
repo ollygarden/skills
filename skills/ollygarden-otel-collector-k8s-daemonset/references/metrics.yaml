@@ -15,7 +15,8 @@ receivers:
   # of the cpu/memory utilization metrics. Same receiver, no extra processors —
   # OllyGarden's preferred "Pattern A" DPM reduction. Do NOT instead raise the
   # interval on a single receiver: that also downsamples the high-information
-  # cpu/memory series. See remediation-metric-dpm-reduction.
+  # cpu/memory series. See the public `otel-collector` interval reference for
+  # the fallback when a source cannot be partitioned into disjoint receivers.
   kubeletstats/main:
     collection_interval: 20s
     auth_type: serviceAccount
@@ -54,7 +55,7 @@ receivers:
   # --- Host metrics -------------------------------------------------------
   # Pattern A again: filesystem capacity is near-static, so it goes to a 300s
   # instance while cpu/memory utilization stay at 60s.
-  hostmetrics/fast:
+  host_metrics/fast:
     collection_interval: 60s # 60s, not 10s — host metrics rarely need finer
     root_path: /hostfs
     scrapers:
@@ -69,7 +70,7 @@ receivers:
           system.memory.usage: {enabled: false}
           system.memory.utilization: {enabled: true}
 
-  hostmetrics/slow:
+  host_metrics/slow:
     collection_interval: 300s # filesystem capacity is near-static
     root_path: /hostfs
     scrapers:
@@ -142,30 +143,17 @@ processors:
           resource.attributes["k8s.volume.type"] == nil and
           IsMatch(resource.attributes["k8s.volume.name"], "^kube-api-access-")
 
-  # Prometheus service-identity cleanup: the scrape pipeline synthesizes a
-  # service.name (= job name) and service.instance.id (= host:port). Left
-  # alone they become junk, high-cardinality service identity. Delete them so
-  # the backend resolves identity from real resource attributes instead.
-  transform/prometheus_service_attributes:
-    error_mode: ignore
-    metric_statements:
-      - context: resource
-        statements:
-          - delete_key(attributes, "service.name") where attributes["service.name"] != nil and IsMatch(attributes["service.name"], "^(kubernetes-pods|kube-state-metrics)")
-          - delete_key(attributes, "service.instance.id") where attributes["service.instance.id"] != nil and IsMatch(attributes["service.instance.id"], ":[0-9]+$")
-
 service:
   pipelines:
     metrics:
-      receivers: [otlp, kubeletstats/main, kubeletstats/volume, hostmetrics/fast, hostmetrics/slow, prometheus]
+      receivers: [otlp, kubeletstats/main, kubeletstats/volume, host_metrics/fast, host_metrics/slow, prometheus]
       processors:
         - memory_limiter
-        - k8sattributes
-        - resourcedetection
+        - k8s_attributes
+        - resource_detection
         - resource/clustername
         - filter/only_monitored_namespaces
         - filter/drop_static_volume_mounts
-        - transform/prometheus_service_attributes
         - transform/truncate_resources
         - batch
       exporters: [otlp]

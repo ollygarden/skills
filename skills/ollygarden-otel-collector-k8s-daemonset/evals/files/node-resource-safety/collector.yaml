@@ -1,0 +1,32 @@
+extensions:
+  file_storage:
+    directory: /tmp/collector-offsets
+
+processors:
+  batch: {}
+  memory_limiter:
+    limit_mib: 256
+  k8s_attributes:
+    auth_type: serviceAccount
+  transform/truncate:
+    trace_statements:
+      - context: resource
+        statements:
+          - truncate_all(attributes, 2048)
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+  file_log:
+    include: [/var/log/pods/*/*/*.log]
+    storage: file_storage
+
+service:
+  extensions: [file_storage]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch, k8s_attributes, memory_limiter, transform/truncate]
+      exporters: [otlp]

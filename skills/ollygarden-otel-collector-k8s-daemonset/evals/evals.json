@@ -1,0 +1,48 @@
+{
+  "skill_name": "ollygarden-otel-collector-k8s-daemonset",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review the attached synthetic DaemonSet collector proposal. The team wants every node agent to collect Kubernetes events and cut trace cost with 10% probabilistic sampling. Keep useful deterministic noise reduction, but identify the right tier for each responsibility. Give recommendations only; do not run or deploy anything.",
+      "expected_output": "A node-agent review that rejects per-node cluster signals and head sampling, moves whole-trace and singleton work to the gateway/cluster tier, and preserves deterministic probe/static filtering.",
+      "files": ["evals/files/gateway-pressure/collector.yaml"],
+      "expectations": [
+        "Rejects probabilistic head sampling at the node agent as a cost-control strategy.",
+        "Places tail_sampling behind load_balancing at the gateway tier where complete traces can be grouped.",
+        "Moves the fixture's k8s_events receiver to a once-per-cluster gateway or cluster Deployment rather than every DaemonSet replica.",
+        "Retains the fixture's deterministic probe filtering at the node when the pattern is bounded and reviewed.",
+        "Does not execute, deploy, pull, or validate the attached configuration."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Review this synthetic node-agent config. We tried to simplify it by putting memory_limiter after batch, allowing every replica to watch all pods, and storing file offsets inside the collector container. Explain the minimum corrections and any deployment assumption that still needs proof. Recommendations only.",
+      "expected_output": "A resource-safe review that restores processor ordering, node-local informer scope, durable offsets, and an explicit node-local OTLP routing verification requirement.",
+      "files": ["evals/files/node-resource-safety/collector.yaml"],
+      "expectations": [
+        "Requires memory_limiter to be the first processor in every signal pipeline.",
+        "Requires canonical k8s_attributes filter.node_from_env_var to use K8S_NODE_NAME so each agent watches only its node.",
+        "Requires file_storage offsets to use host-backed persistent storage and explains that container-local storage loses offsets on pod recreation.",
+        "Requires resource-value truncation to remain last among transforms.",
+        "Does not infer node-local OTLP ingest from a 0.0.0.0 listener alone and requires the DaemonSet networking/routing topology to be verified."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Reduce cost in the attached synthetic node collector. A teammate slowed all kubelet metrics to five minutes, validates metrics.yaml by itself, and enabled global log dedup while keeping file offset attributes. Inspect the attached files read-only, then give the safe replacement and verification plan. Do not run Collector, validation, deployment, or telemetry-generating commands, and do not use real telemetry.",
+      "expected_output": "A cost review that restores split metric cadence, scopes dedup after offset removal, and validates the complete merged configuration with synthetic inputs and output inspection.",
+      "files": [
+        "evals/files/merged-dpm-dedup/common.yaml",
+        "evals/files/merged-dpm-dedup/metrics.yaml",
+        "evals/files/merged-dpm-dedup/logs.yaml"
+      ],
+      "expectations": [
+        "Rejects globally slowing kubelet metrics and recommends disjoint fast and slow receiver instances so CPU and memory retain useful cadence.",
+        "Keeps writable emptyDir volume metrics while dropping read-only static secret, configMap, downwardAPI, and projected service-account-token volume metrics.",
+        "Scopes log dedup to known-chatty services and removes log.file.path and log.file.record_number under the same condition immediately before dedup.",
+        "Requires validation of common, traces, metrics, and logs together from the references working directory rather than validating metrics.yaml alone.",
+        "Requires non-secret synthetic environment values, print-config inspection of merged pipelines and processor order, and sanitized positive/near-miss telemetry checks without production endpoints."
+      ]
+    }
+  ]
+}
