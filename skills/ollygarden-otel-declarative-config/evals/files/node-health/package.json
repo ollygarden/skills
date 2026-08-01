@@ -1,7 +1,7 @@
 {
   "private": true,
   "dependencies": {
-    "@opentelemetry/configuration": "0.9.0",
-    "@opentelemetry/sdk-node": "0.208.0"
+    "@opentelemetry/configuration": "0.221.0",
+    "@opentelemetry/sdk-node": "0.221.0"
   }
 }
