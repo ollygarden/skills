@@ -1,0 +1,16 @@
+{
+  "data": {
+    "id": "ins_03",
+    "service_id": "svc_cart_prod",
+    "service_name": "cart-api",
+    "service_version": "3.2.1",
+    "service_environment": "production",
+    "status": "active",
+    "attributes": {"span_name": "GET /healthz", "sample_count": 4200},
+    "insight_type": {
+      "display_name": "Static health-check tracing",
+      "impact": "Important",
+      "remediation_instructions": "Exclude the exact /healthz server route from HTTP tracing. Keep all other server routes traced, and add a regression test proving /healthz is excluded while /cart remains traced."
+    }
+  }
+}
