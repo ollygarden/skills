@@ -4,7 +4,11 @@ This file provides guidance to AI coding agents when working with code in this r
 
 ## What this repository is
 
-A catalog of **Agent Skills** (per the [agentskills.io](https://agentskills.io/specification) spec) published by OllyGarden. There is no application, build step, test suite, or linter — every change is to Markdown and YAML files that AI agents consume. "Correctness" means a skill is well-scoped, accurate, and registered in all the right places.
+A catalog of **Agent Skills** (per the [agentskills.io](https://agentskills.io/specification) spec) published by OllyGarden. There is no application or build step — every change is to Markdown and YAML files that AI agents consume. "Correctness" means a skill is well-scoped, accurate, and registered in all the right places, which two scripts under `bin/` check.
+
+## Preferred workflow
+
+Whenever a change adds, renames, moves, or removes a skill, or alters a skill's instructions, thresholds, or safety language, follow [`docs/preferred-workflow.md`](docs/preferred-workflow.md). Typo and prose fixes go straight to a PR, unless they touch `SKILL.md` frontmatter or behavior-bearing instructions — a `description:` edit changes when a skill triggers.
 
 ## Architecture
 
@@ -32,8 +36,21 @@ A new skill is only "registered" when it appears in **all** of these. Missing an
 2. The `plugins` array in `.claude-plugin/marketplace.json` (`name` + `source: ./skills/<name>`).
 3. The "Available Skills" table **and** the layout tree in `README.md`.
 
+`./bin/check-skill-inventory.sh` fails the build on any drift between those, in both directions, so run it rather than eyeballing the lists.
+
+## Validation
+
+Two scripts, both run in CI by `.github/workflows/validate.yml`:
+
+- `./bin/validate-skill.sh [skill-dir ...]` — Agent Skills spec conformance (delegated to `skills-ref`) plus the house rules: `SKILL.md` under 500 lines and the `ollygarden-` name prefix. Needs a one-time `uv tool install "$(cat bin/skills-ref.requirement)"`.
+
+  The line cap exists because a `SKILL.md` is loaded in full on every trigger, so each line is context paid for at every activation; detail that isn't needed at trigger time belongs in `references/`, read on demand. A skill near the cap is usually two skills, or one with a reference not yet extracted — don't raise the number.
+- `./bin/check-skill-inventory.sh` — the three registration points above.
+
+A third workflow, `.github/workflows/link-check.yml`, runs [lychee](https://github.com/lycheeverse/lychee) over every Markdown and YAML file on pull requests and weekly. Example and unreachable hosts are excluded in `.github/lychee.toml`; add an exclusion there with a reason rather than dropping a broken link.
+
 ## Conventions
 
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `docs`, `chore`, `refactor`). New skills are typically `feat`.
-- `local/` is gitignored — used for scratch/research notes, never published.
+- `local/` and `.claude/` are gitignored — scratch notes, research, and agent session state, never published.
 - A skill `description` is the trigger surface: it should enumerate concrete user phrasings ("Triggers on ...") so agents activate it reliably. Mirror the existing skills' description style.

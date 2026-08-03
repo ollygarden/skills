@@ -76,7 +76,18 @@ All skill `name:` fields carry an `ollygarden-` prefix to declare ownership in t
 
 Contributions are welcome, including pull requests authored or implemented with AI coding agents.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for skill conventions, validation, evaluation evidence, and
-pull request expectations. First-time contributors sign the organization-wide
+pull request expectations, and [docs/preferred-workflow.md](docs/preferred-workflow.md) for the
+end-to-end path a change takes through this repository.
+
+Before opening a pull request, run the same checks CI runs:
+
+```bash
+uv tool install "$(cat bin/skills-ref.requirement)"   # one-time
+./bin/validate-skill.sh
+./bin/check-skill-inventory.sh
+```
+
+First-time contributors sign the organization-wide
 [OllyGarden CLA](https://github.com/ollygarden/.github/blob/main/CLA.md) through the pull request
 bot.
 

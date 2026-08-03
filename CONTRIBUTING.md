@@ -27,9 +27,12 @@ changes are held to the same bar as any other contribution:
 5. Make and validate your changes.
 6. Open a pull request using the repository template and respond to review feedback.
 
+[`docs/preferred-workflow.md`](docs/preferred-workflow.md) walks the same path in order, with the
+reasoning behind each gate and the exact commands. Follow it for anything beyond a typo fix.
+
 ## Adding or changing a skill
 
-Prefer using the [`skill-creator`](https://github.com/anthropics/skills/tree/main/skill-creator)
+Prefer using the [`skill-creator`](https://github.com/anthropics/skills/tree/main/skills/skill-creator)
 skill to scaffold and refine new skills rather than authoring them by hand.
 
 Skills live under `skills/<skill-name>/` and must follow the
@@ -38,18 +41,34 @@ Skills live under `skills/<skill-name>/` and must follow the
 the `name` field. Skill names in this repository use the `ollygarden-` prefix. Optional
 subdirectories include `scripts/`, `references/`, and `assets/`.
 
-Validate spec conformance locally with the
-[`skills-ref`](https://github.com/agentskills/agentskills/tree/main/skills-ref) reference tool:
-
-```bash
-skills-ref validate skills/<skill-name>
-```
-
 When you add or rename a skill, keep all three registration points in sync:
 
 1. `skills/<skill-name>/SKILL.md`;
 2. the plugin entry in `.claude-plugin/marketplace.json`; and
 3. the Available Skills table and layout tree in `README.md`.
+
+### Validate locally
+
+Two scripts check the rules above, and both run in CI — a miss surfaces as a failed check rather
+than a review comment:
+
+```bash
+# One-time: install the pinned reference validator.
+uv tool install "$(cat bin/skills-ref.requirement)"
+
+./bin/validate-skill.sh          # spec conformance, <500 lines, ollygarden- prefix
+./bin/check-skill-inventory.sh   # README table, README tree, and marketplace vs skills/
+```
+
+`validate-skill.sh` delegates spec conformance to
+[`skills-ref`](https://github.com/agentskills/agentskills/tree/main/skills-ref) and accepts skill
+directories as arguments, so `./bin/validate-skill.sh skills/<skill-name>` checks just yours. The
+inventory script reports drift in both directions: a skill with no entry, and an entry naming a
+skill that does not exist.
+
+A third check runs [lychee](https://github.com/lycheeverse/lychee) over the repository's links on
+every pull request. Example and unreachable hosts are excluded in `.github/lychee.toml`; if your
+change needs a new exclusion, add it there with a reason.
 
 ### Keep opinions and upstream facts separate
 
@@ -65,7 +84,8 @@ lookups and progressive disclosure over broad copied context.
 Every pull request that adds a skill or substantively changes one must include evaluation results
 showing that the skill improves agent output:
 
-1. Choose representative prompts that exercise the changed behavior.
+1. Choose representative prompts that exercise the changed behavior. Skills that carry a checked-in
+   suite keep it in `skills/<skill-name>/evals/evals.json`.
 2. Run each prompt without the skill on a frontier model in a fresh session.
 3. Run the same prompt with the skill using the same model and harness in another fresh session.
 4. Include the prompts, model and harness versions, a comparison of the results, and links to the
@@ -74,6 +94,10 @@ showing that the skill improves agent output:
 Useful evidence includes correcting stale or inaccurate guidance, avoiding wrong turns, retrieving
 the right source more efficiently, or applying OllyGarden's intended workflow consistently. If the
 comparison shows no meaningful improvement, refine the skill before submitting it.
+
+Two rules apply to however many runs you do: repeat each case rather than trusting a single run —
+one sample cannot distinguish a real fix from luck — and preserve genuine misses. Never retry a
+failing run until it passes, and never report a designed or deferred eval as passing.
 
 ## Commit messages
 
