@@ -48,12 +48,19 @@ or the review bot would have caught.
    - Cover a representative happy path, an ambiguous or incomplete input, and — for any skill
      consuming telemetry, CLI output, config, or identifiers — a hostile, malformed, or misleading
      input.
-   - Run each case at least three times. A single run cannot distinguish a real fix from a lucky
-     sample.
-   - Run the with-skill and without-skill arms `CONTRIBUTING.md` requires under the same model,
-     harness, grading rules, and tool access, and say which harness produced the numbers.
+   - Run the three arms [`CONTRIBUTING.md`](../CONTRIBUTING.md#proving-the-skill-helps-harness-results)
+     requires — target skill withheld, current `origin/main` skill, and the proposed PR skill — with
+     the same cases, repetitions, model, harness, grading rules, and tool access in each, and say
+     which harness produced the numbers.
+   - Run each case at least three times per arm. A single run cannot distinguish a real fix from a
+     lucky sample.
    - Preserve genuine misses. Never retry a failing repetition until it passes, and never report a
      designed or deferred eval as passing.
+
+   Editing an existing skill is the case that makes the third arm non-optional. "Withheld vs mine"
+   can look like a clear win while the change has quietly broken something the shipping version
+   already did; only `origin/main` vs proposed can see that. For a brand-new skill the `origin/main`
+   arm is `Not present` and costs nothing.
 
 5. **Run the local checks.** Both run in CI, so a miss here surfaces as a failed check rather than a
    review comment:
