@@ -114,12 +114,15 @@ or the review bot would have caught.
    `gh pr view --comments` shows the flat view and hides resolution state:
 
    ```bash
-   gh api graphql -f query='{repository(owner:"ollygarden",name:"skills"){pullRequest(number:<pr>){reviewThreads(first:100,after:null){pageInfo{hasNextPage endCursor}nodes{isResolved path comments(first:10){nodes{body}}}}}}}'
+   gh api graphql -f query='{repository(owner:"ollygarden",name:"skills"){pullRequest(number:<pr>){reviewThreads(first:100,after:null){pageInfo{hasNextPage endCursor}nodes{isResolved path comments(first:10,after:null){pageInfo{hasNextPage endCursor}nodes{body}}}}}}}'
    ```
 
-   Both connections are paged. If `reviewThreads.pageInfo.hasNextPage` is true, repeat with
-   `after:"<endCursor>"` until it is false — an unresolved count taken from one page is not a count
-   of zero. `comments(first:10)` truncates the same way.
+   Both connections are paged, and both must be walked. If
+   `reviewThreads.pageInfo.hasNextPage` is true, repeat with `after:"<endCursor>"` until it is
+   false — an unresolved count taken from one page is not a count of zero. Each thread's
+   `comments` connection has its own `pageInfo`, asked for above so you can see when it truncates;
+   page any thread whose `comments.pageInfo.hasNextPage` is true before concluding it was
+   answered, since the reply that resolves a long thread is the last comment, not the first ten.
 
    Verify each suggestion against the current head, fix the valid ones, and reply with evidence.
    Dismiss a finding only with a stated reason — a bare resolve is not an answer. Push, then wait

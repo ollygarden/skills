@@ -15,8 +15,13 @@ exclude_path = [
   # Local agent scratch (worktrees, session settings). Absent in CI; skipping it
   # keeps a local run from reporting the same finding once per stale worktree.
   "(^|/)\\.claude/",
-  "(^|/)\\.github/lychee\\.toml$",
-  "(^|/)\\.github/workflows/link-check\\.yml$"
+  # This file, and only this file, is excluded by path: its content is entirely
+  # URL *patterns*, so lychee reads fragments like `https://github/$` out of the
+  # regexes below as links. Excluding those by URL would mean one exclusion per
+  # pattern, each of which is itself a pattern — the rule would chase its own
+  # tail. Every other file in the repository, including the workflow that runs
+  # lychee, is scanned.
+  "(^|/)\\.github/lychee\\.toml$"
 ]
 
 exclude = [
@@ -27,6 +32,12 @@ exclude = [
   # checked.
   "^https://github/$",
   "^https://github\\.com/%7B%7B%7BdepName%7D%7D%7D$",
+  # The one link in link-check.yml: a release URL built from a shell variable, so
+  # it is a template rather than a link until the workflow expands it. Note the
+  # spelling — lychee leaves `$` literal and percent-encodes the braces, so the
+  # unencoded `${LYCHEE_VERSION}` form would silently match nothing. Verified by
+  # running with and without this line.
+  "^https://github\\.com/lycheeverse/lychee/releases/download/\\$%7BLYCHEE_VERSION%7D",
   # No entry is needed for the `${VERSION}`-style install snippets in the skills:
   # they live in fenced code blocks, and `include_verbatim = false` above keeps
   # lychee from extracting those at all. Verified — adding excludes for them

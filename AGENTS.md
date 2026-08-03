@@ -4,7 +4,7 @@ This file provides guidance to AI coding agents when working with code in this r
 
 ## What this repository is
 
-A catalog of **Agent Skills** (per the [agentskills.io](https://agentskills.io/specification) spec) published by OllyGarden. There is no application or build step — every change is to Markdown and YAML files that AI agents consume. "Correctness" means a skill is well-scoped, accurate, and registered in all the right places, which two scripts under `bin/` check.
+A catalog of **Agent Skills** (per the [agentskills.io](https://agentskills.io/specification) spec) published by OllyGarden. There is no application and no build step: the product is the skills themselves, Markdown and YAML that AI agents consume. Around them sits repository tooling — the gate scripts in `bin/`, the workflows and lychee config in `.github/`, and the JSON that registers each skill — which is where the shell, TOML, and JSON in this repository live. "Correctness" for a skill means well-scoped, accurate, and registered in all the right places, which two scripts under `bin/` check.
 
 ## Preferred workflow
 
