@@ -1,0 +1,58 @@
+accept = ["200..=299", "429"]
+max_retries = 2
+retry_wait_time = 2
+timeout = 20
+max_concurrency = 10
+hidden = true
+method = "get"
+extensions = ["md", "markdown", "html", "txt", "rst", "sh", "yml", "yaml", "json", "toml"]
+include_verbatim = false
+
+exclude_path = [
+  "(^|/)\\.git/",
+  "(^|/)\\.lycheecache/",
+  "(^|/)local/",
+  # Local agent scratch (worktrees, session settings). Absent in CI; skipping it
+  # keeps a local run from reporting the same finding once per stale worktree.
+  "(^|/)\\.claude/",
+  # This file, and only this file, is excluded by path: its content is entirely
+  # URL *patterns*, so lychee reads fragments like `https://github/$` out of the
+  # regexes below as links. Excluding those by URL would mean one exclusion per
+  # pattern, each of which is itself a pattern — the rule would chase its own
+  # tail. Every other file in the repository, including the workflow that runs
+  # lychee, is scanned.
+  "(^|/)\\.github/lychee\\.toml$"
+]
+
+exclude = [
+  # renovate.json holds matchStrings regexes and Handlebars templates, so these
+  # two are patterns rather than links: the escaped `https://github\.com/` reads
+  # as `https://github`, and packageNameTemplate as a literal `{{{depName}}}`.
+  # Excluded by URL rather than by path so the file's real $schema URL is still
+  # checked.
+  "^https://github/$",
+  "^https://github\\.com/%7B%7B%7BdepName%7D%7D%7D$",
+  # The one link in link-check.yml: a release URL built from a shell variable, so
+  # it is a template rather than a link until the workflow expands it. Note the
+  # spelling — lychee leaves `$` literal and percent-encodes the braces, so the
+  # unencoded `${LYCHEE_VERSION}` form would silently match nothing. Verified by
+  # running with and without this line.
+  "^https://github\\.com/lycheeverse/lychee/releases/download/\\$%7BLYCHEE_VERSION%7D",
+  # No entry is needed for the `${VERSION}`-style install snippets in the skills:
+  # they live in fenced code blocks, and `include_verbatim = false` above keeps
+  # lychee from extracting those at all. Verified — adding excludes for them
+  # changes nothing (119 links, 23 excluded, 0 errors either way).
+  #
+  # Reserved example hosts used in skill prose and eval fixtures (RFC 2606 /
+  # RFC 6761): deliberately unreachable, and must stay that way.
+  "^https?://([^/]*\\.)?(example|invalid|test|localhost)([:/]|$)",
+  "\\.invalid([:/]|$)",
+  "^http://host/",
+  # Placeholder repository in an eval fixture.
+  "^https://github\\.com/acme/",
+  # Private OllyGarden repositories: unauthenticated CI sees a 404.
+  "^https://github\\.com/ollygarden/rose(/|$)",
+  # The product API. Endpoints answer to authenticated clients, and its root is
+  # a 404 by design, so treat the host as documentation-only.
+  "^https://api\\.([a-z]+\\.)?ollygarden\\.cloud(/|$)"
+]

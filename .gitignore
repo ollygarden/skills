@@ -1,6 +1,12 @@
 # Local directories
 local/
 
+# Local agent session state: settings and scratch worktrees.
+.claude/
+
+# Link-checker cache, written by a local `lychee --cache` run.
+.lycheecache
+
 # OS files
 .DS_Store
 Thumbs.db

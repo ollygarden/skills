@@ -1,0 +1,52 @@
+name: Validate
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  skill-inventory:
+    name: Skill inventory in sync
+    runs-on: blacksmith
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check skill inventory
+        run: ./bin/check-skill-inventory.sh
+
+  skill-spec:
+    name: Skills conform to the Agent Skills spec
+    runs-on: blacksmith
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          # skills-ref is a pinned git dependency rather than a Python project,
+          # so key the cache on the pin itself: bumping the revision in
+          # bin/skills-ref.requirement is exactly when the cache must be rebuilt.
+          cache-dependency-glob: bin/skills-ref.requirement
+
+      - name: Install skills-ref
+        run: uv tool install "$(cat bin/skills-ref.requirement)"
+
+      - name: Validate skills
+        run: ./bin/validate-skill.sh
