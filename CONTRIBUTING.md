@@ -82,22 +82,58 @@ lookups and progressive disclosure over broad copied context.
 ## Proving the skill helps: harness results
 
 Every pull request that adds a skill or substantively changes one must include evaluation results
-showing that the skill improves agent output:
+showing that the skill improves agent output. The required evidence comes from an agent harness
+(Claude Code, or a comparable harness driving a frontier model), run in **three arms**:
 
-1. Choose representative prompts that exercise the changed behavior. Skills that carry a checked-in
-   suite keep it in `skills/<skill-name>/evals/evals.json`.
-2. Run each prompt without the skill on a frontier model in a fresh session.
-3. Run the same prompt with the skill using the same model and harness in another fresh session.
-4. Include the prompts, model and harness versions, a comparison of the results, and links to the
-   transcripts in the pull request description.
+1. **Target skill withheld** — the skill is not installed.
+2. **Current `origin/main` skill** — the skill exactly as it ships today.
+3. **Proposed PR skill** — the skill as this PR would ship it.
+
+Arms 1 and 3 are the A/B comparison this repo has always asked for: does this skill help at all?
+Arm 2 is what catches a **regression in a skill that already ships** — neither of the others can,
+because neither is the current baseline. For a brand-new skill there is no revision to name, so its
+revision cell is `Not present` — but the arm still reports results. It is then the same
+configuration as the withheld arm, so it needs no extra runs. For a change to an existing skill it
+is the arm that matters most.
+
+1. Pick one or more representative prompts a user would realistically ask — ideally prompts that
+   exercise the part of the skill you added or changed. Skills that carry a checked-in suite keep it
+   in `skills/<skill-name>/evals/evals.json`.
+2. Run every arm with the **same** cases, repetitions, model, harness, grading rules, and tool
+   access, each in a fresh session. Name the model and harness once, above the table.
+3. In the withheld arm, withhold **only** the target skill. Leave everything else in place.
+4. Run each case **at least three times** per arm. A single run cannot distinguish a real
+   improvement from a lucky sample.
+5. Report the results in the PR description using the table in the pull request template, and attach
+   or link the transcripts (a gist is fine) so reviewers can verify.
+
+**Sanitize a transcript before you link it.** A harness transcript records everything the agent saw:
+environment variables, tokens pasted into a session, customer names, paths and file contents from
+private repositories. This repository is public and a linked gist usually is too, so redact before
+posting — and if a transcript cannot be sanitized without destroying the evidence, summarize the run
+instead and say that is what you did. A reviewer can work with a summary; neither of us can unpublish
+a leaked credential.
+
+Recording the arms honestly matters more than a clean-looking table:
+
+- **`Not present`** goes in the target-skill revision cell only — for a new skill, on the
+  `origin/main` arm; for a removal, on the proposed arm. The arm's *results* are still required
+  either way.
+- **An arm you did not run, or that was invalidated, is `Not run`, with the reason.** Incomplete
+  evidence is not an improvement claim, and a gap named plainly costs a reviewer far less than one
+  they have to find.
+- **Preserve genuine misses.** Never retry a failing repetition until it passes, and never report a
+  designed-but-unrun case as passing.
 
 Useful evidence includes correcting stale or inaccurate guidance, avoiding wrong turns, retrieving
-the right source more efficiently, or applying OllyGarden's intended workflow consistently. If the
-comparison shows no meaningful improvement, refine the skill before submitting it.
+the right source more efficiently, or applying OllyGarden's intended workflow consistently — and no
+regression against the shipping version. If the comparison shows no meaningful difference, that's a
+signal the skill (or the change) isn't earning its place — rework it rather than submitting the
+results anyway.
 
-Two rules apply to however many runs you do: repeat each case rather than trusting a single run —
-one sample cannot distinguish a real fix from luck — and preserve genuine misses. Never retry a
-failing run until it passes, and never report a designed or deferred eval as passing.
+A pure **efficiency** improvement — trimming a skill so it costs less context while behaving
+identically — is a legitimate result here. Say so, state how you measured it, and show the required
+behavior still passing in the proposed arm.
 
 ## Commit messages
 
