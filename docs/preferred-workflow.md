@@ -55,13 +55,6 @@ or the review bot would have caught.
    - Preserve genuine misses. Never retry a failing repetition until it passes, and never report a
      designed or deferred eval as passing.
 
-   > Under discussion, in a separate PR: adding a third arm — **current `origin/main` skill** —
-   > alongside withheld and proposed. It is the only arm that can catch a regression in a skill that
-   > already shipped, since neither existing arm is the shipped baseline. It changes what we ask of
-   > every contributor, so it gets its own review rather than riding in on a tooling change, and it
-   > must land identically here and in
-   > [`opentelemetry-agent-skills`](https://github.com/ollygarden/opentelemetry-agent-skills).
-
 5. **Run the local checks.** Both run in CI, so a miss here surfaces as a failed check rather than a
    review comment:
 

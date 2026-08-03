@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   check-links:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith
 
     steps:
       - name: Checkout Repo

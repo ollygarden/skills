@@ -15,7 +15,7 @@ permissions:
 jobs:
   skill-inventory:
     name: Skill inventory in sync
-    runs-on: ubuntu-latest
+    runs-on: blacksmith
 
     steps:
       - name: Checkout Repo
@@ -28,7 +28,7 @@ jobs:
 
   skill-spec:
     name: Skills conform to the Agent Skills spec
-    runs-on: ubuntu-latest
+    runs-on: blacksmith
 
     steps:
       - name: Checkout Repo
