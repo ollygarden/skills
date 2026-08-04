@@ -9,14 +9,10 @@ extensions = ["md", "markdown", "html", "txt", "rst", "sh", "yml", "yaml", "json
 include_verbatim = false
 
 exclude_path = [
+  # Prove each exclusion by removing it and rerunning the checker. A pattern
+  # that cannot match is dead configuration and should be removed; one that
+  # does not match today may be conditional only when its valid mode is known.
   "(^|/)\\.git/",
-  # Conditional, not dead: nothing matches this in a default run, but a local
-  # `lychee --cache` creates the directory. Keep the distinction in mind when
-  # pruning — an exclusion that cannot match is dead configuration and should
-  # be removed; one that does not match today may still have a valid mode.
-  # Prove the distinction by removing the exclusion and rerunning the checker
-  # in the mode that is supposed to produce the match.
-  "(^|/)\\.lycheecache/",
   "(^|/)local/",
   # Local agent scratch (worktrees, session settings). Absent in CI; skipping it
   # keeps a local run from reporting the same finding once per stale worktree.
