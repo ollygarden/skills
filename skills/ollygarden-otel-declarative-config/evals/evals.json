@@ -6,8 +6,8 @@
       "prompt": "Review the attached Java migration. The team moved every telemetry setting into otel.yaml and deleted the custom SpanProcessor because the file boots cleanly. Identify what must change and how to prove the migration preserved behavior; don't edit files.",
       "expected_output": "A migration review that retains the code-level query sanitizer unless the exact runtime has a verified equivalent and requires marker-based behavioral verification.",
       "files": [
-        "evals/files/java-migration/src/Telemetry.java",
-        "evals/files/java-migration/otel.yaml"
+        "files/java-migration/src/Telemetry.java",
+        "files/java-migration/otel.yaml"
       ],
       "expectations": [
         "Inventories the code-registered QuerySanitizingSpanProcessor as a behavioral guarantee rather than assuming YAML replaces arbitrary code.",
@@ -23,8 +23,8 @@
       "prompt": "Can this Python 1.44 service use declarative OpenTelemetry config now? Review the attached requirements and resource block against OllyGarden's conventions. We want standard deployment overrides to keep working and do not want made-up mandatory attributes.",
       "expected_output": "A runtime-qualified recommendation that delegates current Python support details upstream, preserves standard environment substitution, and avoids universal custom-resource requirements.",
       "files": [
-        "evals/files/python-runtime/requirements.txt",
-        "evals/files/python-runtime/otel.yaml"
+        "files/python-runtime/requirements.txt",
+        "files/python-runtime/otel.yaml"
       ],
       "expectations": [
         "Does not categorically force an env-only or programmatic Python fallback and requires current support to be verified upstream.",
@@ -40,8 +40,8 @@
       "prompt": "Review this Node service's proposed production otel.yaml. Product only said to suppress /healthz; nobody chose a sampling ratio yet. Keep upstream trace decisions intact, prevent secret leakage, and don't assume experimental sampler support. Give recommendations, not edits.",
       "expected_output": "A runtime-qualified review that refuses an unapproved full-sampling default, preserves parent decisions, externalizes secrets, and avoids generic unsupported sampler YAML.",
       "files": [
-        "evals/files/node-health/package.json",
-        "evals/files/node-health/otel.yaml"
+        "files/node-health/package.json",
+        "files/node-health/otel.yaml"
       ],
       "expectations": [
         "Does not accept SAMPLE_RATE defaulting to 1.0 or silently choose another production sampling commitment.",
