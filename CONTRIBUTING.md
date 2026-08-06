@@ -35,11 +35,12 @@ reasoning behind each gate and the exact commands. Follow it for anything beyond
 Prefer using the [`skill-creator`](https://github.com/anthropics/skills/tree/main/skills/skill-creator)
 skill to scaffold and refine new skills rather than authoring them by hand.
 
-Skills live under `skills/<skill-name>/` and must follow the
+Published skills live under `skills/<skill-name>/` and must follow the
 [Agent Skills specification](https://agentskills.io/specification). Each skill must include a
 `SKILL.md` with YAML frontmatter containing `name` and `description`; the directory name must match
 the `name` field. Skill names in this repository use the `ollygarden-` prefix. Optional
-subdirectories include `scripts/`, `references/`, and `assets/`.
+subdirectories include `scripts/`, `references/`, and `assets/`. Retired skills are preserved under
+`deprecated/` for historical reference and are not registered or validated as published skills.
 
 When you add or rename a skill, keep all three registration points in sync:
 
