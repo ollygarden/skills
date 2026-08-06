@@ -12,7 +12,7 @@ cluster Deployment for `tail_sampling`, `load_balancing`, `k8s_cluster`, and `k8
 
 This repository owns OllyGarden's decisions, not component facts. Consult `otel-collector` for
 current component keys, defaults, and stability; `otel-ottl` for syntax; and the relevant
-public language setup skill or `ollygarden-otel-auto-instrumentation` for source-side fixes.
+public OpenTelemetry language or instrumentation skill for source-side fixes.
 
 ## Non-negotiable pipeline contract
 
@@ -67,8 +67,8 @@ receivers without a partition knob, consult the public `otel-collector` `routing
 - Drop probe spans using the bounded route/path/name patterns in `references/traces.yaml`; the
   filters cover current and legacy HTTP attributes plus framework handler names. Keep regexes
   anchored.
-- Prefer source-side suppression for static assets (`ollygarden-otel-auto-instrumentation`); use
-  the Collector filter as a portable fallback.
+- Prefer source-side suppression for static assets following the relevant public OpenTelemetry
+  instrumentation guidance; use the Collector filter as a portable fallback.
 - Do not probabilistically head-sample at the agent for cost. Keep the agent lossless except for
   reviewed deterministic noise filters; whole-trace reduction requires gateway
   `tail_sampling` behind `load_balancing`.
@@ -108,5 +108,5 @@ version limits.
 
 - Component configuration and OTTL: `otel-collector`, `otel-ottl`.
 - Generic deep-merge mechanics: `ollygarden-otel-collector-config-decomposition`.
-- Source-side telemetry design and suppression: `ollygarden-otel-auto-instrumentation`,
-  `ollygarden-otel-manual-instrumentation`.
+- Source-side telemetry design and suppression: the relevant public OpenTelemetry language and
+  instrumentation skills.

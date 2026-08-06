@@ -94,6 +94,8 @@ or the review bot would have caught.
      tool that is not written down here does not exist for anyone following it.
    - Any `references/` doc, or any other skill, that restates a threshold, schema, command, or file
      path this change moved. A skill's contract is often quoted in more than one place.
+   - `deprecated/` — archived skills are historical snapshots, while its README must accurately
+     identify what is no longer published and where current guidance lives.
 
    Be exact about what is enforced and what is not. A doc that promises a check nothing runs is
    worse than no doc, because the next contributor trusts it; when a constraint is review-enforced

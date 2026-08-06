@@ -31,9 +31,10 @@ processors:
   # Drop spans for static-asset requests (images/css/js/fonts). These are
   # high-volume, low-value, and never the subject of a latency investigation.
   # NOTE: the preferred fix is at the source — suppress the span in nginx /
-  # ingress-nginx (see `ollygarden-otel-auto-instrumentation`). This collector
-  # filter is the portable fallback when you do not control the proxy. Regex is
-  # the canonical asset pattern; the (?:\?.*)?$ tail matches a query string.
+  # ingress-nginx following the relevant public OpenTelemetry instrumentation
+  # guidance. This collector filter is the portable fallback when you do not
+  # control the proxy. Regex is the canonical asset pattern; the (?:\?.*)?$
+  # tail matches a query string.
   filter/drop_static_assets:
     error_mode: ignore
     traces:

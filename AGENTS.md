@@ -12,12 +12,15 @@ Whenever a change adds, renames, moves, or removes a skill, or alters a skill's 
 
 ## Architecture
 
-Each skill is a self-contained directory under `skills/<skill-name>/`:
+Each published skill is a self-contained directory under `skills/<skill-name>/`:
 
 - `SKILL.md` (required) — YAML frontmatter (`name`, `description`, optional `license`, `compatibility`, `metadata`) followed by the instruction body.
 - `scripts/` (optional) — helper or validation scripts.
 - `references/` (optional) — supporting docs the SKILL.md links to for detail it doesn't inline.
 - `assets/` (optional) — static files used by the skill.
+
+Retired skills live under `deprecated/<skill-name>/` as historical snapshots. They are not
+published in the marketplace and do not participate in active skill inventory or validation.
 
 Two hard rules that are easy to get wrong:
 
