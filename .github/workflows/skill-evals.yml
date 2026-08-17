@@ -1,0 +1,110 @@
+# Runs each changed skill's evals.json via skills-test-runner.
+#
+# REPORT-ONLY for now: the job never blocks a merge (continue-on-error +
+# non-required check). Flip to blocking once a few weeks of runs show the
+# flake rate is near zero.
+#
+# Secrets:
+#   RUNNER_REPO_TOKEN       read-only fine-grained PAT for ollygarden/skills-test-runner
+#   CLAUDE_CODE_OAUTH_TOKEN sessions bill here (claude setup-token)
+#   ANTHROPIC_API_KEY       the temperature-0 API judge bills here
+#
+# The runner strips ANTHROPIC_API_KEY from skill sessions by design, so the
+# split above is exactly what happens: sessions on the OAuth token, judge on
+# API credits.
+name: Skill evals (report-only)
+
+on:
+  pull_request:
+    paths:
+      - "skills/**"
+
+permissions:
+  contents: read
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30 # per-session timeouts exist, this is the backstop
+    continue-on-error: true # report-only
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Checkout skills-test-runner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ollygarden/skills-test-runner
+          token: ${{ secrets.RUNNER_REPO_TOKEN }}
+          path: runner
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Install runner deps
+        working-directory: runner
+        run: bun install --frozen-lockfile
+
+      - name: Install claude CLI and duckdb
+        run: |
+          set -euo pipefail
+          npm install -g @anthropic-ai/claude-code
+          curl -fsSL https://install.duckdb.org | sh
+          echo "$HOME/.duckdb/cli/latest" >> "$GITHUB_PATH"
+
+      - name: Detect changed suites
+        id: suites
+        run: |
+          set -euo pipefail
+          dirs=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" -- 'skills/**' \
+            | cut -d/ -f1,2 | sort -u)
+          out=""
+          for d in $dirs; do
+            [ -f "$d/evals/evals.json" ] && out="$out $GITHUB_WORKSPACE/$d"
+          done
+          echo "dirs=$out" >> "$GITHUB_OUTPUT"
+          echo "changed suites:$out"
+
+      # Loose key on purpose: the runner's cache entries are content-addressed
+      # (model + claude version + prompt + fixtures + skill digest), so stale
+      # entries are never hit — they just sit until the cache evicts.
+      - name: Restore eval answer cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .eval-cache
+          key: eval-cache-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            eval-cache-${{ runner.os }}-
+
+      - name: Run evals
+        if: steps.suites.outputs.dirs != ''
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -uo pipefail
+          bun runner/src/cli.ts ${{ steps.suites.outputs.dirs }} \
+            --no-baseline \
+            --judge-via api \
+            --cache-dir "$GITHUB_WORKSPACE/.eval-cache" \
+            --results results.json 2> summary.txt
+          status=$?
+          {
+            echo "### Skill eval results"
+            echo '```'
+            cat summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat summary.txt
+          exit $status
+
+      - name: Upload results
+        if: always() && steps.suites.outputs.dirs != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: skill-eval-results
+          path: results.json
+          if-no-files-found: ignore
