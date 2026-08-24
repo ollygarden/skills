@@ -4,6 +4,9 @@ local/
 # Local agent session state: settings and scratch worktrees.
 .claude/
 
+# Amp orb portal metadata.
+.amp/portals/*
+
 # Link-checker cache, written by a local `lychee --cache` run.
 .lycheecache
 
