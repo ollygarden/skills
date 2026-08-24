@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+started_at=$SECONDS
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+echo "[setup] Checking system prerequisites"
+missing_packages=()
+command -v curl >/dev/null 2>&1 || missing_packages+=(curl)
+command -v git >/dev/null 2>&1 || missing_packages+=(git)
+command -v jq >/dev/null 2>&1 || missing_packages+=(jq)
+command -v sha256sum >/dev/null 2>&1 || missing_packages+=(coreutils)
+command -v tar >/dev/null 2>&1 || missing_packages+=(tar)
+
+if [ "${#missing_packages[@]}" -gt 0 ]; then
+  if [ "$(id -u)" -eq 0 ]; then
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y "${missing_packages[@]}"
+  else
+    sudo apt-get update
+    sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y "${missing_packages[@]}"
+  fi
+fi
+
+mkdir -p "$HOME/.local/bin"
+
+echo "[setup] Installing uv when absent"
+uv_bin="$(command -v uv || true)"
+if [ -z "$uv_bin" ]; then
+  curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh
+  uv_bin="$HOME/.local/bin/uv"
+fi
+"$uv_bin" --version
+
+echo "[setup] Installing the pinned Agent Skills validator"
+requirement_file="$repo_root/bin/skills-ref.requirement"
+marker_dir="${XDG_CACHE_HOME:-$HOME/.cache}/amp/orb-setup/ollygarden-skills"
+marker_file="$marker_dir/skills-ref.requirement"
+if ! command -v skills-ref >/dev/null 2>&1 || ! cmp -s "$requirement_file" "$marker_file"; then
+  "$uv_bin" tool install --force "$(cat "$requirement_file")"
+  mkdir -p "$marker_dir"
+  cp -- "$requirement_file" "$marker_file"
+fi
+
+echo "[setup] Installing the CI-pinned link checker"
+lychee_version="0.24.2"
+installed_lychee_version="$(lychee --version 2>/dev/null | awk '{print $2}' || true)"
+if [ "$installed_lychee_version" != "$lychee_version" ]; then
+  case "$(uname -m)" in
+    x86_64) target="x86_64-unknown-linux-musl" ;;
+    aarch64 | arm64) target="aarch64-unknown-linux-musl" ;;
+    *)
+      echo "Unsupported architecture for Lychee: $(uname -m)" >&2
+      exit 1
+      ;;
+  esac
+
+  asset="lychee-${target}.tar.gz"
+  base_url="https://github.com/lycheeverse/lychee/releases/download/lychee-v${lychee_version}"
+  temp_dir="$(mktemp -d)"
+  trap 'rm -rf -- "$temp_dir"' EXIT
+  curl -fsSL "$base_url/$asset" -o "$temp_dir/$asset"
+  curl -fsSL "$base_url/$asset.sha256" -o "$temp_dir/$asset.sha256"
+  (cd "$temp_dir" && sha256sum -c "$asset.sha256")
+  tar -xzf "$temp_dir/$asset" -C "$temp_dir"
+  lychee_bin="$(find "$temp_dir" -type f -name lychee -perm /111 -print -quit)"
+  [ -n "$lychee_bin" ] || {
+    echo "Lychee executable not found in $asset" >&2
+    exit 1
+  }
+  install -m 0755 "$lychee_bin" "$HOME/.local/bin/lychee"
+  rm -rf -- "$temp_dir"
+  trap - EXIT
+fi
+lychee --version
+
+echo "[setup] Ready in $((SECONDS - started_at))s"
