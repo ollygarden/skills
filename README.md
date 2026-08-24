@@ -56,7 +56,7 @@ both packages so they can reference upstream skills such as `otel-collector` and
 
 | Skill | Description |
 |-------|-------------|
-| [`ollygarden-cli`](skills/ollygarden-cli/) | Use the `ollygarden` CLI to query services, insights, analytics, organizations, and manage webhooks from the terminal. |
+| [`ollygarden-cli`](skills/ollygarden-cli/) | Use the `ollygarden` CLI to inspect Rose repositories, findings, and executions alongside telemetry services, insights, analytics, organizations, and webhooks. |
 | [`ollygarden-insight-remediation`](skills/ollygarden-insight-remediation/) | Fetch active service insights from the Olive API and apply remediation fixes to the current codebase. |
 | [`ollygarden-otel-collector-k8s-daemonset`](skills/ollygarden-otel-collector-k8s-daemonset/) | OllyGarden's opinionated, optimization-first OTel Collector config for a Kubernetes node agent (DaemonSet): drop early at the node, curated receivers, noise/cardinality/cost reduction across logs, metrics, traces. |
 | [`ollygarden-otel-collector-config-validation`](skills/ollygarden-otel-collector-config-validation/) | OllyGarden's end-to-end method for validating a collector config: `otelcol validate`, then a real collector in Docker/Podman fed by telemetrygen with a file exporter, asserting that a processor or connector actually transforms, drops, or routes telemetry as intended. |
