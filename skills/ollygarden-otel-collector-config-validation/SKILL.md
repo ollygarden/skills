@@ -67,16 +67,17 @@ and the exact immutable image for the deployed version.
 registry, image, tag, and digest; explain that the runtime may download and execute that image; then
 wait for an affirmative response. The original validation request is not consent to pull or run it.
 
-Known example, captured 2026-07 (use only when it matches the target version):
+Reviewed example, verified 2026-09-09 (use only when it matches the target version):
 
 ```text
-docker.io/otel/opentelemetry-collector-contrib:0.156.0@sha256:125bdbeb7590cc1952c5b3430ecf14063568980c2c93d5b38676cc0446ed8108
+docker.io/otel/opentelemetry-collector-contrib:0.160.0@sha256:799dc6cf12c96192af37b5bdba804da8c10b3bc563b43cb90c3f3c58d9572ad6
 ```
 
 Never execute a tag-only reference. Re-resolve and review the digest when changing the tag.
-If the user did not supply a deployed version, present the exact known example above as a candidate
-and ask them to approve it or provide the target version. Do not replace the tag or digest with a
-placeholder, and do not execute until one exact reference is confirmed.
+If the user did not supply a deployed version, resolve the immutable digest for the version targeted
+by the related upstream skills. Present the reviewed example only if it matches; otherwise present
+the resolved reference. Ask the user to approve that exact tag and digest or provide the target
+version.
 
 On enforcing SELinux, `:Z` privately relabels a host path in place. Apply it only to the fresh
 scratch config copy and output directory—never a shared directory, home directory, or sole config
