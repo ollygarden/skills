@@ -5,7 +5,7 @@
     "start": "node --import ./dist/telemetry.js ./dist/app.js"
   },
   "dependencies": {
-    "@opentelemetry/auto-instrumentations-node": "^0.79.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.80.0",
     "@opentelemetry/sdk-node": "^0.221.0",
     "express": "^5.1.0",
     "pg": "^8.16.0"
