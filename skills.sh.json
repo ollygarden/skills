@@ -1,0 +1,20 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "Collector",
+      "description": "OllyGarden's opinions on configuring and validating the OpenTelemetry Collector.",
+      "skills": [
+        "ollygarden-otel-collector-k8s-daemonset",
+        "ollygarden-otel-collector-config-validation",
+        "ollygarden-otel-collector-config-decomposition"
+      ]
+    },
+    {
+      "title": "OllyGarden platform",
+      "description": "Working with OllyGarden findings and the ollygarden CLI.",
+      "skills": ["ollygarden-cli", "ollygarden-insight-remediation"]
+    }
+  ]
+}

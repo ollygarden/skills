@@ -31,13 +31,14 @@ Two hard rules that are easy to get wrong:
 
 The `ollygarden-otel-*` skills deliberately contain only OllyGarden's *opinions*. They reference upstream OpenTelemetry *facts* (semantic conventions, SDK versions, component config keys, OTTL syntax) that live in the companion package [`opentelemetry-agent-skills`](https://github.com/ollygarden/opentelemetry-agent-skills) — e.g. `otel-semantic-conventions`, `otel-sdk-versions`, `otel-collector`, `otel-ottl`. When editing an opinion skill, point at the upstream skill for facts rather than duplicating them. Some skills also hand off to each other (e.g. `ollygarden-cli` defers *applying* fixes to `ollygarden-insight-remediation`).
 
-## Adding or renaming a skill — keep three places in sync
+## Adding or renaming a skill — keep four places in sync
 
 A new skill is only "registered" when it appears in **all** of these. Missing any one is the most common defect:
 
 1. The directory `skills/<name>/` with a `SKILL.md`.
 2. The `plugins` array in `.claude-plugin/marketplace.json` (`name` + `source: ./skills/<name>`).
 3. The "Available Skills" table **and** the layout tree in `README.md`.
+4. A grouping in `skills.sh.json`, which sets the sections on the skills.sh repository page.
 
 `./bin/check-skill-inventory.sh` fails the build on any drift between those, in both directions, so run it rather than eyeballing the lists.
 
@@ -48,7 +49,7 @@ Two scripts, both run in CI by `.github/workflows/validate.yml`:
 - `./bin/validate-skill.sh [skill-dir ...]` — Agent Skills spec conformance (delegated to `skills-ref`) plus the house rules: `SKILL.md` under 500 lines and the `ollygarden-` name prefix. Needs a one-time `uv tool install "$(cat bin/skills-ref.requirement)"`.
 
   The line cap exists because a `SKILL.md` is loaded in full on every trigger, so each line is context paid for at every activation; detail that isn't needed at trigger time belongs in `references/`, read on demand. A skill near the cap is usually two skills, or one with a reference not yet extracted — don't raise the number.
-- `./bin/check-skill-inventory.sh` — the three registration points above.
+- `./bin/check-skill-inventory.sh` — the four registration points above.
 
 A third workflow, `.github/workflows/link-check.yml`, runs [lychee](https://github.com/lycheeverse/lychee) over every Markdown and YAML file on pull requests and weekly. Example and unreachable hosts are excluded in `.github/lychee.toml`; add an exclusion there with a reason rather than dropping a broken link.
 

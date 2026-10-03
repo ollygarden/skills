@@ -1,11 +1,22 @@
 # OllyGarden Agent Skills
 
+[![skills.sh](https://www.skills.sh/b/ollygarden/skills)](https://www.skills.sh/ollygarden/skills)
 [![CLA](https://img.shields.io/badge/CLA-required-blue.svg)](https://github.com/ollygarden/.github/blob/main/CLA.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-Public OllyGarden AI skills for [Rose](https://github.com/ollygarden/rose) and the broader OllyGarden ecosystem. Skills are self-contained folders that package instructions, scripts, and resources for AI coding agents.
+OllyGarden Agent Skills are open source skills that carry OllyGarden's opinions on OpenTelemetry into coding agents such as Claude Code, Cursor, Codex, and GitHub Copilot: how to configure and validate the OpenTelemetry Collector, and how to work with the OllyGarden platform. They build on the vendor-neutral facts in the companion [`opentelemetry-agent-skills`](https://github.com/ollygarden/opentelemetry-agent-skills) package, and [Rose](https://ollygarden.com/products/rose), OllyGarden's AI instrumentation agent, uses both. See both packages at [ollygarden.com/resources/agent-skills](https://ollygarden.com/resources/agent-skills).
 
 The skills in this repository follow the standardized [Agent Skills](https://agentskills.io/specification) format.
+
+## Available Skills
+
+| Skill | Description |
+|-------|-------------|
+| [`ollygarden-cli`](skills/ollygarden-cli/) | Use the `ollygarden` CLI to inspect Rose repositories, findings, and executions alongside telemetry services, insights, analytics, organizations, and webhooks. |
+| [`ollygarden-insight-remediation`](skills/ollygarden-insight-remediation/) | Fetch active service insights from the Olive API and apply remediation fixes to the current codebase. |
+| [`ollygarden-otel-collector-k8s-daemonset`](skills/ollygarden-otel-collector-k8s-daemonset/) | OllyGarden's opinionated, optimization-first OTel Collector config for a Kubernetes node agent (DaemonSet): drop early at the node, curated receivers, noise/cardinality/cost reduction across logs, metrics, traces. |
+| [`ollygarden-otel-collector-config-validation`](skills/ollygarden-otel-collector-config-validation/) | OllyGarden's end-to-end method for validating a collector config: `otelcol validate`, then a real collector in Docker/Podman fed by telemetrygen with a file exporter, asserting that a processor or connector actually transforms, drops, or routes telemetry as intended. |
+| [`ollygarden-otel-collector-config-decomposition`](skills/ollygarden-otel-collector-config-decomposition/) | OllyGarden's opinion on when and how to decompose a monolithic OTel Collector config into multiple merged files — and when to leave it alone. Executes the split by concern (deep-merged `--config file:` sources), verifies the merged result is behavior-equivalent, and reports the reasoning, including a deliberate no-op for configs simple enough not to need it. |
 
 ## Installation
 
@@ -32,6 +43,16 @@ npx skills add https://github.com/ollygarden/skills/tree/main/skills/ollygarden-
 /plugin install <skill-name>@skills
 ```
 
+### Cursor, Codex, GitHub Copilot, and other agents
+
+The `skills` CLI installs into the coding agents it detects. Pass `-a` to choose one, such as `cursor`, `codex`, or `github-copilot`:
+
+```bash
+npx skills add ollygarden/skills -a cursor
+```
+
+See the [skills CLI documentation](https://github.com/vercel-labs/skills#supported-agents) for every supported agent.
+
 ## Layout
 
 Every published skill is a top-level directory under `skills/` whose name matches the skill's
@@ -51,16 +72,6 @@ skill namespace. The Collector skills contain OllyGarden's opinions layered on t
 OpenTelemetry facts published in the companion package
 [`opentelemetry-agent-skills`](https://github.com/ollygarden/opentelemetry-agent-skills); install
 both packages so they can reference upstream skills such as `otel-collector` and `otel-ottl`.
-
-## Available Skills
-
-| Skill | Description |
-|-------|-------------|
-| [`ollygarden-cli`](skills/ollygarden-cli/) | Use the `ollygarden` CLI to inspect Rose repositories, findings, and executions alongside telemetry services, insights, analytics, organizations, and webhooks. |
-| [`ollygarden-insight-remediation`](skills/ollygarden-insight-remediation/) | Fetch active service insights from the Olive API and apply remediation fixes to the current codebase. |
-| [`ollygarden-otel-collector-k8s-daemonset`](skills/ollygarden-otel-collector-k8s-daemonset/) | OllyGarden's opinionated, optimization-first OTel Collector config for a Kubernetes node agent (DaemonSet): drop early at the node, curated receivers, noise/cardinality/cost reduction across logs, metrics, traces. |
-| [`ollygarden-otel-collector-config-validation`](skills/ollygarden-otel-collector-config-validation/) | OllyGarden's end-to-end method for validating a collector config: `otelcol validate`, then a real collector in Docker/Podman fed by telemetrygen with a file exporter, asserting that a processor or connector actually transforms, drops, or routes telemetry as intended. |
-| [`ollygarden-otel-collector-config-decomposition`](skills/ollygarden-otel-collector-config-decomposition/) | OllyGarden's opinion on when and how to decompose a monolithic OTel Collector config into multiple merged files — and when to leave it alone. Executes the split by concern (deep-merged `--config file:` sources), verifies the merged result is behavior-equivalent, and reports the reasoning, including a deliberate no-op for configs simple enough not to need it. |
 
 ## Deprecated Skills
 

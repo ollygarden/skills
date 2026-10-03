@@ -7,6 +7,7 @@
 #   2. .claude-plugin/marketplace.json   — the Claude Code plugin entry
 #   3. README.md "Available Skills"      — the table contributors read
 #   4. README.md layout tree             — the fenced `skills/` listing
+#   5. skills.sh.json groupings          — the sections on the skills.sh repo page
 #
 # Checks run in BOTH directions: a skill with no entry, and an entry naming a
 # skill that does not exist. The marketplace `source` path is checked against
@@ -25,6 +26,7 @@ cd "$REPO_ROOT"
 
 README="README.md"
 MARKETPLACE=".claude-plugin/marketplace.json"
+SKILLS_SH="skills.sh.json"
 
 failures=0
 fail() {
@@ -42,7 +44,7 @@ contains() {
   return 1
 }
 
-for f in "$README" "$MARKETPLACE"; do
+for f in "$README" "$MARKETPLACE" "$SKILLS_SH"; do
   [ -f "$f" ] || {
     echo "FAIL: $f not found; run from anywhere, but the repository must be intact" >&2
     exit 1
@@ -111,10 +113,12 @@ read_into README_TREE < <(
 )
 
 read_into MARKETPLACE_ENTRIES < <(jq -r '.plugins[].name' "$MARKETPLACE")
+read_into GROUPED < <(jq -r '.groupings[].skills[]' "$SKILLS_SH")
 
 report_duplicates "the $README 'Available Skills' table" ${README_ROWS[@]+"${README_ROWS[@]}"}
 report_duplicates "the $README layout tree" ${README_TREE[@]+"${README_TREE[@]}"}
 report_duplicates "$MARKETPLACE" ${MARKETPLACE_ENTRIES[@]+"${MARKETPLACE_ENTRIES[@]}"}
+report_duplicates "$SKILLS_SH" ${GROUPED[@]+"${GROUPED[@]}"}
 
 for row in "${README_ROWS[@]}"; do
   case "$row" in
@@ -136,6 +140,9 @@ for skill in "${SKILLS[@]}"; do
 
   contains "$skill" "${MARKETPLACE_ENTRIES[@]}" ||
     fail "$skill has no entry in $MARKETPLACE"
+
+  contains "$skill" "${GROUPED[@]}" ||
+    fail "$skill is in no grouping in $SKILLS_SH"
 done
 
 for name in "${README_ROWS[@]}"; do
@@ -152,6 +159,11 @@ done
 for name in "${MARKETPLACE_ENTRIES[@]}"; do
   contains "$name" "${SKILLS[@]}" ||
     fail "$MARKETPLACE lists '$name', which is not a directory under skills/"
+done
+
+for name in "${GROUPED[@]}"; do
+  contains "$name" "${SKILLS[@]}" ||
+    fail "$SKILLS_SH groups '$name', which is not a directory under skills/"
 done
 
 # Marketplace source paths must point at the matching directory. This loop runs
@@ -171,4 +183,4 @@ if [ "$failures" -gt 0 ]; then
   exit 1
 fi
 
-echo "OK: ${#SKILLS[@]} skills; README table, README layout tree, and marketplace are in sync"
+echo "OK: ${#SKILLS[@]} skills; README table, README layout tree, marketplace, and $SKILLS_SH are in sync"

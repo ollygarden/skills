@@ -43,7 +43,7 @@ destroy the evidence, give a summary instead and say that it replaces the transc
 ## Checklist
 
 - [ ] `./bin/validate-skill.sh` passes ([Agent Skills spec](https://agentskills.io/specification) + house rules)
-- [ ] `./bin/check-skill-inventory.sh` passes — skill registered in all three places (skill directory, `.claude-plugin/marketplace.json`, `README.md` table + tree)
+- [ ] `./bin/check-skill-inventory.sh` passes — skill registered in all four places (skill directory, `.claude-plugin/marketplace.json`, `README.md` table + tree, `skills.sh.json` grouping)
 - [ ] Content keeps OllyGarden opinions separate from upstream OpenTelemetry facts
 - [ ] All three harness arms reported above, or explicitly marked `Not run` / `Not present` with a reason — if skill content changed
 - [ ] Commit messages follow Conventional Commits
