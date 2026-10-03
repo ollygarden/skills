@@ -42,11 +42,12 @@ the `name` field. Skill names in this repository use the `ollygarden-` prefix. O
 subdirectories include `scripts/`, `references/`, and `assets/`. Retired skills are preserved under
 `deprecated/` for historical reference and are not registered or validated as published skills.
 
-When you add or rename a skill, keep all three registration points in sync:
+When you add or rename a skill, keep all four registration points in sync:
 
 1. `skills/<skill-name>/SKILL.md`;
-2. the plugin entry in `.claude-plugin/marketplace.json`; and
-3. the Available Skills table and layout tree in `README.md`.
+2. the plugin entry in `.claude-plugin/marketplace.json`;
+3. the Available Skills table and layout tree in `README.md`; and
+4. a grouping in `skills.sh.json`.
 
 ### Validate locally
 
