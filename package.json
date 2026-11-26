@@ -1,0 +1,9 @@
+{
+  "name": "@ollygarden/skills",
+  "version": "0.0.0",
+  "description": "OllyGarden Agent Skills",
+  "license": "Apache-2.0",
+  "repository": "github:ollygarden/skills",
+  "files": ["skills/", "!skills/*/evals/"],
+  "publishConfig": { "registry": "https://npm.pkg.github.com" }
+}
