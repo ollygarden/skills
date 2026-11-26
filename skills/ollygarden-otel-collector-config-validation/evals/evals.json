@@ -43,6 +43,23 @@
         "Publishes OTLP on 127.0.0.1 only and keeps the in-container receiver reachable on 0.0.0.0.",
         "Plans to run as the host UID where appropriate, accounts for rootless Podman, flushes output, and asserts the transformed field value."
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "I approve running docker.io/otel/opentelemetry-collector-contrib:0.160.0@sha256:799dc6cf12c96192af37b5bdba804da8c10b3bc563b43cb90c3f3c58d9572ad6 on my workstation to behaviorally validate the filter processor in the attached config with an OTLP-in/file-out harness. The workstation runs Fedora with SELinux enforcing and rootless Podman 5. Give me the exact commands to run. I will run them myself; don't execute anything.",
+      "expected_output": "Runnable commands for the approved digest that join read-only mount options as :ro,Z, run the container as the host user under rootless Podman, keep early-exit logs visible, and keep the scratch-only, loopback, and flush-then-assert safeguards.",
+      "files": ["files/filter-processor/production.yaml"],
+      "expectations": [
+        "Joins the read-only config mount options with a comma (`:ro,Z` or `:Z,ro`); fails if any mount, after shell variable expansion, contains `:ro:Z`.",
+        "Under rootless Podman, runs the container process as the host user, for example with `--userns=keep-id --user \"$(id -u):$(id -g)\"`; fails if it runs as the image's default non-root user without host-UID mapping.",
+        "Uses exactly the approved digest-pinned Collector image, never a tag-only reference, and does not itself pull or run anything or claim to have done so.",
+        "Runs no other container image (such as telemetrygen) unless it is digest-pinned and flagged as needing its own approval.",
+        "Applies SELinux `Z` relabeling only to a fresh scratch copy of the config and a fresh output directory, never the production file, a shared directory, or the home directory.",
+        "Publishes OTLP only on host 127.0.0.1 while the in-container receiver binds 0.0.0.0:4317.",
+        "Uses a bounded readiness check that fails if the container exits early or never becomes ready, and a cleanup that removes the test container.",
+        "When the Collector exits before readiness, prints its logs from a container that still exists (for example, one started without `--rm`).",
+        "Stops the Collector before reading output, then asserts that a matching GET /healthz span is absent and a non-matching application span is present."
+      ]
     }
   ]
 }

@@ -24,25 +24,28 @@ cp ./harness.yaml "$OTEL_TEST_DIR/harness.yaml"
 mkdir "$OTEL_TEST_DIR/out"
 
 if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce)" = Enforcing ]; then
-  OTEL_TEST_SELINUX=:Z
+  OTEL_TEST_SELINUX=,Z
 fi
 
 cleanup() {
-  "$OTEL_TEST_RUNTIME" rm -f "$OTEL_TEST_NAME" >/dev/null 2>&1 || true
+  OTEL_TEST_STATUS=$?
+  "$OTEL_TEST_RUNTIME" logs "$OTEL_TEST_NAME" >"$OTEL_TEST_DIR/collector.log" 2>&1 || true
+  [ "$OTEL_TEST_STATUS" -eq 0 ] || cat "$OTEL_TEST_DIR/collector.log" >&2
+  "$OTEL_TEST_RUNTIME" rm -fv "$OTEL_TEST_NAME" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
 OTEL_TEST_USER_ARGS="--user $(id -u):$(id -g)"
 if [ "$OTEL_TEST_RUNTIME" = podman ] && \
    [ "$(podman info --format '{{.Host.Security.Rootless}}' 2>/dev/null)" = true ]; then
-  OTEL_TEST_USER_ARGS=
+  OTEL_TEST_USER_ARGS="--userns=keep-id $OTEL_TEST_USER_ARGS"
 fi
 
-"$OTEL_TEST_RUNTIME" run -d --rm --name "$OTEL_TEST_NAME" \
+"$OTEL_TEST_RUNTIME" run -d --name "$OTEL_TEST_NAME" \
   -p 127.0.0.1:4317:4317 \
   $OTEL_TEST_USER_ARGS \
   -v "$OTEL_TEST_DIR/harness.yaml:/etc/otelcol-contrib/config.yaml:ro$OTEL_TEST_SELINUX" \
-  -v "$OTEL_TEST_DIR/out:/output$OTEL_TEST_SELINUX" \
+  -v "$OTEL_TEST_DIR/out:/output:rw$OTEL_TEST_SELINUX" \
   "$OTEL_TEST_IMAGE" --config=/etc/otelcol-contrib/config.yaml
 
 OTEL_TEST_ATTEMPTS=0
@@ -66,4 +69,5 @@ done
 
 Inspect `$OTEL_TEST_DIR/out` before removing the scratch directory. Use a distinct scratch directory
 for every positive/negative or routing case so outputs cannot be conflated. Record the image digest,
-Collector logs, generated markers, assertion commands, and output excerpts.
+Collector logs (`$OTEL_TEST_DIR/collector.log`), generated markers, assertion commands, and output
+excerpts.
