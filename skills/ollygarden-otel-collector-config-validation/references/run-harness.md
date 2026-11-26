@@ -29,9 +29,13 @@ fi
 
 cleanup() {
   OTEL_TEST_STATUS=$?
-  "$OTEL_TEST_RUNTIME" logs "$OTEL_TEST_NAME" >"$OTEL_TEST_DIR/collector.log" 2>&1 || true
-  [ "$OTEL_TEST_STATUS" -eq 0 ] || cat "$OTEL_TEST_DIR/collector.log" >&2
-  "$OTEL_TEST_RUNTIME" rm -fv "$OTEL_TEST_NAME" >/dev/null 2>&1 || true
+  set +e
+  if ! "$OTEL_TEST_RUNTIME" logs "$OTEL_TEST_NAME" >"$OTEL_TEST_DIR/collector.log" 2>&1; then
+    "$OTEL_TEST_RUNTIME" logs "$OTEL_TEST_NAME" >&2
+  elif [ "$OTEL_TEST_STATUS" -ne 0 ]; then
+    cat "$OTEL_TEST_DIR/collector.log" >&2
+  fi
+  "$OTEL_TEST_RUNTIME" rm -fv "$OTEL_TEST_NAME" >/dev/null 2>&1
 }
 trap cleanup EXIT
 
@@ -69,5 +73,5 @@ done
 
 Inspect `$OTEL_TEST_DIR/out` before removing the scratch directory. Use a distinct scratch directory
 for every positive/negative or routing case so outputs cannot be conflated. Record the image digest,
-Collector logs (`$OTEL_TEST_DIR/collector.log`), generated markers, assertion commands, and output
+Collector logs (`$OTEL_TEST_DIR/collector.log`, or stderr if saving it failed), generated markers, assertion commands, and output
 excerpts.
