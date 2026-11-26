@@ -53,6 +53,18 @@ npx skills add ollygarden/skills -a cursor
 
 See the [skills CLI documentation](https://github.com/vercel-labs/skills#supported-agents) for every supported agent.
 
+### npm
+
+Each merge to `main` that changes `skills/` publishes `@ollygarden/skills@1.0.<run>` to GitHub Packages, without `evals/`. Installing needs a token with `read:packages`:
+
+```bash
+echo '@ollygarden:registry=https://npm.pkg.github.com' >> .npmrc
+echo '//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}' >> .npmrc
+GITHUB_TOKEN=$(gh auth token) npm install @ollygarden/skills
+```
+
+`npm view @ollygarden/skills@<version> gitHead` shows the source commit.
+
 ## Layout
 
 Every published skill is a top-level directory under `skills/` whose name matches the skill's
