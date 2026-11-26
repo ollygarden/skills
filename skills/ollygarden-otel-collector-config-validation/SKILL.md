@@ -81,14 +81,15 @@ version.
 
 On enforcing SELinux, `:Z` privately relabels a host path in place. Apply it only to the fresh
 scratch config copy and output directory—never a shared directory, home directory, or sole config
-copy. Publish the unauthenticated test receiver on host loopback only.
+copy. Join it to other mount options with a comma (`:ro,Z`); `:ro:Z` is rejected. Publish the
+unauthenticated test receiver on host loopback only.
 
 Before stopping for approval, the preflight must explicitly include all of these review items:
 
 - exact registry/image/tag/digest and the statement that it may be downloaded and executed;
 - fresh scratch paths and the host-label mutation risk of private `:Z` relabeling;
 - host `127.0.0.1` publication with in-container `0.0.0.0` binding;
-- host UID/GID behavior, including the rootless Podman exception;
+- host UID/GID mapping: `--user "$(id -u):$(id -g)"`, plus `--userns=keep-id` on rootless Podman;
 - bounded readiness/exit detection, cleanup, stop-to-flush, and the exact value assertion.
 
 Use an unambiguous disclosure: **“This may download and execute remote container code.”** Do not
@@ -98,7 +99,7 @@ soften it to “pull an image” or assume the user understands what a container
 
 After the exact image is approved, read [`references/run-harness.md`](references/run-harness.md).
 Its bounded readiness check must fail if the container exits or never becomes ready, and its cleanup
-trap must remove the test container. On rootless Podman, omit `--user` if UID mapping prevents output.
+trap must remove the test container.
 
 Generate the exact signal, resource attributes, telemetry attributes, name, kind, severity, and
 metric type required by each case. Never send telemetry after failed startup.
